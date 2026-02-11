@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>La Bonita | ERP Compras</title>
+
 <link rel="stylesheet" href="styles.css">
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -12,141 +14,177 @@
 <body>
 
 <!-- LOGIN -->
-<div id="loginContainer" class="login-box">
-  <h1>La Bonita</h1>
-  <p class="sub">Helados y Más…</p>
+<div id="loginContainer" class="login-page">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="brand-dot"></div>
+      <div>
+        <h1>La Bonita</h1>
+        <p>Helados y Más…</p>
+      </div>
+    </div>
 
-  <input type="text" id="usuario" placeholder="Usuario">
-  <input type="password" id="password" placeholder="Contraseña">
-  <button onclick="login()">Ingresar</button>
+    <h2>Acceso al sistema</h2>
 
-  <p id="errorLogin" class="error"></p>
+    <div class="login-form">
+      <label>Usuario</label>
+      <input type="text" id="usuario" placeholder="LBHYM">
+
+      <label>Contraseña</label>
+      <input type="password" id="password" placeholder="••••••••">
+
+      <button class="btn-primary" onclick="login()">Ingresar</button>
+      <p id="errorLogin" class="error"></p>
+    </div>
+  </div>
 </div>
 
 <!-- SISTEMA -->
-<div id="sistema" style="display:none;">
+<div id="sistema" class="app" style="display:none;">
 
-<header class="topbar">
-  <div>
-    <h2>ERP Compras</h2>
-    <p>La Bonita, Helados y Más…</p>
-  </div>
-
-  <button class="logout" onclick="logout()">Cerrar sesión</button>
-</header>
-
-<section class="dashboard">
-  <div class="card">
-    <h4>Total Invertido</h4>
-    <p id="totalInvertido">$0</p>
-  </div>
-  <div class="card">
-    <h4>Total Compras</h4>
-    <p id="totalCompras">0</p>
-  </div>
-  <div class="card">
-    <h4>Producto Más Comprado</h4>
-    <p id="productoTop">-</p>
-  </div>
-  <div class="card">
-    <h4>Promedio General</h4>
-    <p id="promedioGeneral">$0</p>
-  </div>
-</section>
-
-<section class="modulo">
-  <div class="modulo-header">
-    <h3 id="tituloFormulario">Registro de Compras</h3>
-    <span class="tag">Compras</span>
-  </div>
-
-  <div class="formulario">
-    <div class="campo">
-      <label>Proveedor</label>
-      <input id="proveedor" placeholder="Ej. COSTCO">
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="logo-mini"></div>
+      <div>
+        <div class="topbar-title">ERP Compras</div>
+        <div class="topbar-sub">La Bonita, Helados y Más…</div>
+      </div>
     </div>
 
-    <div class="campo">
-      <label>Producto</label>
-      <input id="producto" placeholder="Ej. Fresa 1kg">
-    </div>
+    <button class="btn-ghost" onclick="logout()">Cerrar sesión</button>
+  </header>
 
-    <div class="campo">
-      <label>Cantidad</label>
-      <input id="cantidad" type="number" placeholder="Ej. 10">
-    </div>
+  <!-- CONTENIDO -->
+  <main class="content">
 
-    <div class="campo">
-      <label>Costo unitario</label>
-      <input id="costo" type="number" step="0.01" placeholder="Ej. 23.00">
-    </div>
+    <!-- DASHBOARD -->
+    <section class="grid-4">
+      <div class="kpi">
+        <div class="kpi-title">Total invertido</div>
+        <div class="kpi-value" id="totalInvertido">$0</div>
+      </div>
 
-    <div class="campo">
-      <label>Fecha</label>
-      <input id="fecha" type="date">
-    </div>
+      <div class="kpi">
+        <div class="kpi-title">Total compras</div>
+        <div class="kpi-value" id="totalCompras">0</div>
+      </div>
 
-    <div class="campo">
-      <label>Notas</label>
-      <input id="notas" placeholder="Ej. Comprado por caja">
-    </div>
-  </div>
+      <div class="kpi">
+        <div class="kpi-title">Producto más comprado</div>
+        <div class="kpi-value" id="productoTop">-</div>
+      </div>
 
-  <div class="botonera">
-    <button class="btn-primary" id="btnGuardar" onclick="guardarRegistro()">Registrar</button>
-    <button class="btn-danger" id="btnCancelar" onclick="cancelarEdicion()" style="display:none;">Cancelar</button>
-  </div>
+      <div class="kpi">
+        <div class="kpi-title">Promedio general</div>
+        <div class="kpi-value" id="promedioGeneral">$0</div>
+      </div>
+    </section>
 
-  <div class="acciones">
-    <input id="buscador" placeholder="Buscar proveedor o producto..." onkeyup="mostrar()">
-    <button class="btn-secondary" onclick="exportarExcel()">Exportar Excel</button>
-  </div>
+    <!-- MODULO COMPRAS -->
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h3 id="tituloFormulario">Registro de Compras</h3>
+          <p>Captura compras de proveedores y consulta historial.</p>
+        </div>
+        <span class="badge">Compras</span>
+      </div>
 
-  <div class="tabla-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Proveedor</th>
-          <th>Producto</th>
-          <th>Cantidad</th>
-          <th>Costo</th>
-          <th>Total</th>
-          <th>Fecha</th>
-          <th>Notas</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody id="tabla"></tbody>
-    </table>
-  </div>
-</section>
+      <div class="form-grid">
+        <div class="field">
+          <label>Proveedor</label>
+          <input id="proveedor" placeholder="Ej. COSTCO">
+        </div>
 
-<section class="modulo">
-  <div class="modulo-header">
-    <h3>Análisis de Costos</h3>
-    <span class="tag">Análisis</span>
-  </div>
+        <div class="field">
+          <label>Producto</label>
+          <input id="producto" placeholder="Ej. Fresa caja 10kg">
+        </div>
 
-  <div class="acciones">
-    <select id="selectorProducto" onchange="graficar()"></select>
-  </div>
+        <div class="field">
+          <label>Cantidad</label>
+          <input id="cantidad" type="number" placeholder="Ej. 40">
+        </div>
 
-  <div class="grafica-wrap">
-    <canvas id="grafica"></canvas>
-  </div>
+        <div class="field">
+          <label>Costo unitario</label>
+          <input id="costo" type="number" step="0.01" placeholder="Ej. 23.00">
+        </div>
 
-  <div id="variacion" class="variacion"></div>
-</section>
+        <div class="field">
+          <label>Fecha</label>
+          <input id="fecha" type="date">
+        </div>
 
-<footer class="footer">
-  Hecho para La Bonita 💚 | ERP Compras
-</footer>
+        <div class="field">
+          <label>Notas</label>
+          <input id="notas" placeholder="Ej. Compra semanal">
+        </div>
+      </div>
 
+      <div class="form-actions">
+        <button class="btn-primary" id="btnGuardar" onclick="guardarRegistro()">Registrar</button>
+        <button class="btn-danger" id="btnCancelar" onclick="cancelarEdicion()" style="display:none;">Cancelar</button>
+      </div>
+
+      <div class="toolbar">
+        <input id="buscador" placeholder="Buscar proveedor o producto..." onkeyup="mostrar()">
+        <button class="btn-secondary" onclick="exportarExcel()">Exportar Excel</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Proveedor</th>
+              <th>Producto</th>
+              <th>Cantidad</th>
+              <th>Costo</th>
+              <th>Total</th>
+              <th>Fecha</th>
+              <th>Notas</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- MODULO ANALISIS -->
+    <section class="panel">
+      <div class="panel-header">
+        <div>
+          <h3>Análisis de Costos</h3>
+          <p>Visualiza el comportamiento del costo unitario por producto.</p>
+        </div>
+        <span class="badge">Análisis</span>
+      </div>
+
+      <div class="toolbar">
+        <select id="selectorProducto" onchange="graficar()"></select>
+      </div>
+
+      <div class="chart-wrap">
+        <canvas id="grafica"></canvas>
+      </div>
+
+      <div id="variacion" class="variation"></div>
+    </section>
+
+    <footer class="footer">
+      Sistema interno • La Bonita, Helados y Más…
+    </footer>
+
+  </main>
 </div>
 
 <script src="script.js"></script>
 </body>
 </html>
+
+
 
 
 
