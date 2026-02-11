@@ -4,7 +4,7 @@ let datos = [];
 let graficaActual = null;
 
 let modoEdicion = false;
-let idEditando = null;
+let filaEditando = null;
 
 /* ================= LOGIN ================= */
 
@@ -57,39 +57,39 @@ async function cargarDatos() {
   actualizarProveedoresDeProducto();
 }
 
-/* ================= MOSTRAR ================= */
+/* ================= MOSTRAR TABLA ================= */
 
 function mostrar() {
   const tabla = document.getElementById("tabla");
   const filtro = document.getElementById("buscador").value.toLowerCase();
   tabla.innerHTML = "";
 
-  datos.slice(1).forEach((fila) => {
+  datos.slice(1).forEach((fila, index) => {
 
-    // NUEVO ORDEN:
-    // 0 ID
-    // 1 PROVEEDOR
-    // 2 PRODUCTO
-    // 3 CANTIDAD
-    // 4 COSTO
-    // 5 TOTAL
-    // 6 FECHA
-    // 7 NOTAS
+    // ORDEN REAL (SIN ID):
+    // 0 PROVEEDOR
+    // 1 PRODUCTO
+    // 2 CANTIDAD
+    // 3 COSTO
+    // 4 TOTAL
+    // 5 FECHA
+    // 6 NOTAS
 
-    const id = fila[0];
-    const proveedor = (fila[1] || "").toString();
-    const producto = (fila[2] || "").toString();
+    const proveedor = (fila[0] || "").toString();
+    const producto = (fila[1] || "").toString();
 
     if (
       !proveedor.toLowerCase().includes(filtro) &&
       !producto.toLowerCase().includes(filtro)
     ) return;
 
-    const cantidad = Number(fila[3]) || 0;
-    const costo = Number(fila[4]) || 0;
-    const total = Number(fila[5]) || 0;
-    const fecha = fila[6] ? new Date(fila[6]).toLocaleDateString() : "";
-    const notas = fila[7] || "";
+    const cantidad = Number(fila[2]) || 0;
+    const costo = Number(fila[3]) || 0;
+    const total = Number(fila[4]) || 0;
+    const fecha = fila[5] ? new Date(fila[5]).toLocaleDateString() : "";
+    const notas = fila[6] || "";
+
+    const filaRealSheets = index + 2;
 
     tabla.innerHTML += `
       <tr>
@@ -101,8 +101,8 @@ function mostrar() {
         <td>${fecha}</td>
         <td>${notas}</td>
         <td class="acciones">
-          <button class="btn-mini btn-edit" onclick="cargarEdicion('${id}')">Editar</button>
-          <button class="btn-mini btn-del" onclick="eliminar('${id}')">Borrar</button>
+          <button class="btn-mini btn-edit" onclick="cargarEdicion(${filaRealSheets}, ${index})">Editar</button>
+          <button class="btn-mini btn-del" onclick="eliminar(${filaRealSheets})">Borrar</button>
         </td>
       </tr>
     `;
@@ -115,21 +115,17 @@ function actualizarDashboard() {
   const registros = datos.slice(1);
 
   let total = 0;
-  let resumenCantidades = {};
-  let resumenTotalComprado = {};
+  let resumen = {};
 
   registros.forEach(fila => {
-    const producto = fila[2];
-    const cant = Number(fila[3]) || 0;
-    const tot = Number(fila[5]) || 0;
+    const prod = fila[1];
+    const cant = Number(fila[2]) || 0;
+    const tot = Number(fila[4]) || 0;
 
     total += tot;
 
-    if (!resumenCantidades[producto]) resumenCantidades[producto] = 0;
-    resumenCantidades[producto] += cant;
-
-    if (!resumenTotalComprado[producto]) resumenTotalComprado[producto] = 0;
-    resumenTotalComprado[producto] += tot;
+    if (!resumen[prod]) resumen[prod] = 0;
+    resumen[prod] += cant;
   });
 
   document.getElementById("totalInvertido").innerText = "$" + total.toFixed(2);
@@ -137,9 +133,9 @@ function actualizarDashboard() {
 
   let top = "-";
   let max = 0;
-  Object.keys(resumenCantidades).forEach(p => {
-    if (resumenCantidades[p] > max) {
-      max = resumenCantidades[p];
+  Object.keys(resumen).forEach(p => {
+    if (resumen[p] > max) {
+      max = resumen[p];
       top = p;
     }
   });
@@ -169,7 +165,7 @@ async function guardarRegistro() {
   if (modoEdicion) {
     await postGoogle({
       accion: "editar",
-      id: idEditando,
+      fila: filaEditando,
       proveedor,
       producto,
       cantidad,
@@ -201,23 +197,22 @@ async function guardarRegistro() {
 
 /* ================= CARGAR EDICION ================= */
 
-function cargarEdicion(id) {
+function cargarEdicion(filaRealSheets, index) {
 
-  const fila = datos.slice(1).find(f => String(f[0]) === String(id));
-  if (!fila) return;
+  const fila = datos[index + 1];
 
-  document.getElementById("proveedor").value = fila[1] || "";
-  document.getElementById("producto").value = fila[2] || "";
-  document.getElementById("cantidad").value = fila[3] || "";
-  document.getElementById("costo").value = fila[4] || "";
+  document.getElementById("proveedor").value = fila[0] || "";
+  document.getElementById("producto").value = fila[1] || "";
+  document.getElementById("cantidad").value = fila[2] || "";
+  document.getElementById("costo").value = fila[3] || "";
 
-  const fecha = fila[6] ? fila[6].toString().split("T")[0] : "";
+  const fecha = fila[5] ? fila[5].toString().split("T")[0] : "";
   document.getElementById("fecha").value = fecha;
 
-  document.getElementById("notas").value = fila[7] || "";
+  document.getElementById("notas").value = fila[6] || "";
 
   modoEdicion = true;
-  idEditando = id;
+  filaEditando = filaRealSheets;
 
   document.getElementById("btnGuardar").innerText = "Actualizar";
   document.getElementById("btnCancelar").style.display = "inline-block";
@@ -228,7 +223,7 @@ function cargarEdicion(id) {
 
 function cancelarEdicion() {
   modoEdicion = false;
-  idEditando = null;
+  filaEditando = null;
 
   limpiarFormulario();
 
@@ -250,12 +245,12 @@ function limpiarFormulario() {
 
 /* ================= ELIMINAR ================= */
 
-async function eliminar(id) {
+async function eliminar(filaRealSheets) {
   if (!confirm("¿Seguro que deseas borrar este registro?")) return;
 
   await postGoogle({
     accion: "eliminar",
-    id
+    fila: filaRealSheets
   });
 
   cargarDatos();
@@ -265,13 +260,13 @@ async function eliminar(id) {
 
 function exportarExcel() {
   const exportar = datos.slice(1).map(f => ({
-    Proveedor: f[1],
-    Producto: f[2],
-    Cantidad: f[3],
-    Costo: f[4],
-    Total: f[5],
-    Fecha: f[6],
-    Notas: f[7]
+    Proveedor: f[0],
+    Producto: f[1],
+    Cantidad: f[2],
+    Costo: f[3],
+    Total: f[4],
+    Fecha: f[5],
+    Notas: f[6]
   }));
 
   const hoja = XLSX.utils.json_to_sheet(exportar);
@@ -286,7 +281,7 @@ function cargarSelectorProductos() {
   const selectorProducto = document.getElementById("selectorProducto");
   selectorProducto.innerHTML = "";
 
-  const productos = [...new Set(datos.slice(1).map(f => f[2]))].filter(Boolean);
+  const productos = [...new Set(datos.slice(1).map(f => f[1]))].filter(Boolean);
 
   productos.forEach(p => {
     selectorProducto.innerHTML += `<option value="${p}">${p}</option>`;
@@ -294,130 +289,7 @@ function cargarSelectorProductos() {
 }
 
 function actualizarProveedoresDeProducto() {
-  const producto = document.getElementById("selectorProducto").value;
-  const selectorProveedor = document.getElementById("selectorProveedor");
-
-  const proveedores = [...new Set(
-    datos.slice(1)
-      .filter(f => f[2] === producto)
-      .map(f => f[1])
-  )].filter(Boolean);
-
-  selectorProveedor.innerHTML = `<option value="__TODOS__">Todos los proveedores</option>`;
-
-  proveedores.forEach(p => {
-    selectorProveedor.innerHTML += `<option value="${p}">${p}</option>`;
-  });
-
-  graficar();
-}
-
-/* ================= GRAFICA + RESUMEN ================= */
-
-function graficar() {
-  const prod = document.getElementById("selectorProducto").value;
-  const prov = document.getElementById("selectorProveedor").value;
-
-  const variacion = document.getElementById("variacion");
-  const mejorProveedor = document.getElementById("mejorProveedor");
-
-  let historial = datos.slice(1).filter(f => f[2] === prod);
-
-  if (prov !== "__TODOS__") {
-    historial = historial.filter(f => f[1] === prov);
-  }
-
-  historial.sort((a, b) => new Date(a[6]) - new Date(b[6]));
-
-  const labels = historial.map(f => new Date(f[6]).toLocaleDateString());
-  const precios = historial.map(f => Number(f[4]) || 0);
-
-  if (graficaActual) graficaActual.destroy();
-
-  graficaActual = new Chart(document.getElementById("grafica"), {
-    type: "line",
-    data: {
-      labels,
-      datasets: [{
-        label: prov === "__TODOS__" ? `Costo general: ${prod}` : `Costo ${prov}: ${prod}`,
-        data: precios,
-        borderColor: "#C29B40",
-        fill: false
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false
-    }
-  });
-
-  // Resumen claro
-  if (precios.length === 0) {
-    variacion.innerText = "Sin datos para este filtro.";
-  } else {
-    const ultimo = precios[precios.length - 1];
-    const promedio = precios.reduce((a,b)=>a+b,0) / precios.length;
-
-    let texto = `📌 Último costo: $${ultimo.toFixed(2)} • Promedio: $${promedio.toFixed(2)}`;
-
-    if (precios.length >= 2) {
-      const diff = ultimo - precios[precios.length - 2];
-      texto += diff > 0 ? ` • 🔺 Subió $${diff.toFixed(2)}`
-        : diff < 0 ? ` • 🔻 Bajó $${Math.abs(diff).toFixed(2)}`
-        : ` • ➖ Sin cambio`;
-    }
-
-    variacion.innerText = texto;
-  }
-
-  // Mejor proveedor (solo si está en TODOS)
-  if (prov === "__TODOS__") {
-    const porProveedor = {};
-
-    datos.slice(1)
-      .filter(f => f[2] === prod)
-      .forEach(f => {
-        const proveedor = f[1];
-        const cantidad = Number(f[3]) || 0;
-        const total = Number(f[5]) || 0;
-
-        if (!porProveedor[proveedor]) {
-          porProveedor[proveedor] = { cantidad: 0, total: 0 };
-        }
-        porProveedor[proveedor].cantidad += cantidad;
-        porProveedor[proveedor].total += total;
-      });
-
-    let mejor = null;
-    let mejorProm = Infinity;
-
-    Object.keys(porProveedor).forEach(p => {
-      const cant = porProveedor[p].cantidad;
-      const prom = cant ? porProveedor[p].total / cant : Infinity;
-
-      if (prom < mejorProm) {
-        mejorProm = prom;
-        mejor = p;
-      }
-    });
-
-    if (mejor) {
-      mejorProveedor.innerHTML = `🏆 <b>Mejor proveedor para "${prod}"</b>: ${mejor} (Promedio ponderado: $${mejorProm.toFixed(2)})`;
-    } else {
-      mejorProveedor.innerHTML = "";
-    }
-  } else {
-    mejorProveedor.innerHTML = "";
-  }
-}
-
-/* ================= AUTO LOGIN ================= */
-
-window.onload = () => {
-  if (localStorage.getItem("LB_LOGGED") === "1") {
-    entrarSistema();
-  }
-};
+  const producto = document.getElementB
 
 
 
