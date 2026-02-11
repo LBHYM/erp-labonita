@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La Bonita | ERP Compras</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginContainer" class="login-box">
+  <h2>La Bonita, Helados y Más…</h2>
+  <input type="text" id="usuario" placeholder="Usuario">
+  <input type="password" id="password" placeholder="Contraseña">
+  <button onclick="login()">Ingresar</button>
+  <p id="errorLogin"></p>
+</div>
+
+<!-- SISTEMA -->
+<div id="sistema" style="display:none;">
+
+<h2>ERP Compras - La Bonita</h2>
+
+<section class="dashboard">
+  <div class="card">
+    <h4>Total Invertido</h4>
+    <p id="totalInvertido">$0</p>
+  </div>
+  <div class="card">
+    <h4>Total Compras</h4>
+    <p id="totalCompras">0</p>
+  </div>
+  <div class="card">
+    <h4>Producto Más Comprado</h4>
+    <p id="productoTop">-</p>
+  </div>
+  <div class="card">
+    <h4>Promedio General</h4>
+    <p id="promedioGeneral">$0</p>
+  </div>
+</section>
+
+<section class="modulo">
+  <h3>Registro de Compras</h3>
+
+  <div class="formulario">
+    <input id="proveedor" placeholder="Proveedor">
+    <input id="producto" placeholder="Producto">
+    <input id="cantidad" type="number" placeholder="Cantidad">
+    <input id="costo" type="number" step="0.01" placeholder="Costo Unitario">
+    <input id="fecha" type="date">
+    <input id="notas" placeholder="Notas">
+    <button onclick="agregar()">Registrar</button>
+  </div>
+
+  <div class="acciones">
+    <input id="buscador" placeholder="Buscar..." onkeyup="mostrar()">
+    <button onclick="exportarExcel()">Exportar Excel</button>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Proveedor</th>
+        <th>Producto</th>
+        <th>Cantidad</th>
+        <th>Costo</th>
+        <th>Total</th>
+        <th>Fecha</th>
+        <th>Notas</th>
+      </tr>
+    </thead>
+    <tbody id="tabla"></tbody>
+  </table>
+</section>
+
+<section class="modulo">
+  <h3>Análisis de Costos</h3>
+  <select id="selectorProducto" onchange="graficar()"></select>
+  <canvas id="grafica"></canvas>
+  <div id="variacion"></div>
+</section>
+
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
+
