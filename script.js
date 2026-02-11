@@ -42,7 +42,7 @@ async function cargarDatos() {
 
   mostrar();
   actualizarDashboard();
-  cargarSelector();
+  cargarSelectorProductos();
 }
 
 /* ================= MOSTRAR ================= */
@@ -262,27 +262,60 @@ function exportarExcel() {
   XLSX.writeFile(libro, "Compras_LaBonita.xlsx");
 }
 
-/* ================= SELECTOR + GRAFICA ================= */
+/* ================= SELECTORES ANALISIS ================= */
 
-function cargarSelector() {
-  const selector = document.getElementById("selectorProducto");
-  selector.innerHTML = "";
+function cargarSelectorProductos() {
+  const selectorProducto = document.getElementById("selectorProducto");
+  selectorProducto.innerHTML = "";
 
-  const productos = [...new Set(datos.slice(1).map(f => f[1]))];
+  const productos = [...new Set(datos.slice(1).map(f => f[1]))].filter(Boolean);
 
   productos.forEach(p => {
-    selector.innerHTML += `<option value="${p}">${p}</option>`;
+    selectorProducto.innerHTML += `<option value="${p}">${p}</option>`;
   });
 
-  if (productos.length) graficar();
+  actualizarProveedoresDeProducto();
 }
 
-function graficar() {
-  const selector = document.getElementById("selectorProducto");
-  const variacion = document.getElementById("variacion");
+function actualizarProveedoresDeProducto() {
+  const producto = document.getElementById("selectorProducto").value;
+  const selectorProveedor = document.getElementById("selectorProveedor");
 
-  const prod = selector.value;
-  const historial = datos.slice(1).filter(f => f[1] === prod);
+  const proveedores = [...new Set(
+    datos.slice(1)
+      .filter(f => f[1] === producto)
+      .map(f => f[0])
+  )].filter(Boolean);
+
+  selectorProveedor.innerHTML = `<option value="__TODOS__">Todos los proveedores</option>`;
+
+  proveedores.forEach(p => {
+    selectorProveedor.innerHTML += `<option value="${p}">${p}</option>`;
+  });
+
+  graficar();
+}
+
+/* ================= GRAFICA (PRODUCTO O PRODUCTO+PROVEEDOR) ================= */
+
+function graficar() {
+  const selectorProducto = document.getElementById("selectorProducto");
+  const selectorProveedor = document.getElementById("selectorProveedor");
+  const variacion = document.getElementById("variacion");
+  const mejorProveedor = document.getElementById("mejorProveedor");
+
+  const prod = selectorProducto.value;
+  const prov = selectorProveedor.value;
+
+  // Filtrar historial
+  let historial = datos.slice(1).filter(f => f[1] === prod);
+
+  if (prov !== "__TODOS__") {
+    historial = historial.filter(f => f[0] === prov);
+  }
+
+  // Ordenar por fecha
+  historial.sort((a, b) => new Date(a[5]) - new Date(b[5]));
 
   const labels = historial.map(f => new Date(f[5]).toLocaleDateString());
   const precios = historial.map(f => Number(f[3]) || 0);
@@ -294,7 +327,7 @@ function graficar() {
     data: {
       labels,
       datasets: [{
-        label: "Costo unitario",
+        label: prov === "__TODOS__" ? "Costo (general)" : `Costo (${prov})`,
         data: precios,
         borderColor: "#C29B40",
         fill: false
@@ -302,6 +335,7 @@ function graficar() {
     }
   });
 
+  // Variación
   if (precios.length >= 2) {
     const diff = precios[precios.length - 1] - precios[precios.length - 2];
     variacion.innerText =
@@ -310,6 +344,46 @@ function graficar() {
       : "➖ Sin cambio vs compra anterior";
   } else {
     variacion.innerText = "";
+  }
+
+  // Mejor proveedor (solo si está en "todos")
+  if (prov === "__TODOS__") {
+    const porProveedor = {};
+
+    datos.slice(1)
+      .filter(f => f[1] === prod)
+      .forEach(f => {
+        const proveedor = f[0];
+        const cantidad = Number(f[2]) || 0;
+        const total = Number(f[4]) || 0;
+
+        if (!porProveedor[proveedor]) {
+          porProveedor[proveedor] = { cantidad: 0, total: 0 };
+        }
+        porProveedor[proveedor].cantidad += cantidad;
+        porProveedor[proveedor].total += total;
+      });
+
+    let mejor = null;
+    let mejorProm = Infinity;
+
+    Object.keys(porProveedor).forEach(p => {
+      const cant = porProveedor[p].cantidad;
+      const prom = cant ? porProveedor[p].total / cant : Infinity;
+
+      if (prom < mejorProm) {
+        mejorProm = prom;
+        mejor = p;
+      }
+    });
+
+    if (mejor) {
+      mejorProveedor.innerHTML = `🏆 <b>Mejor proveedor para "${prod}"</b>: ${mejor} (Promedio: $${mejorProm.toFixed(2)})`;
+    } else {
+      mejorProveedor.innerHTML = "";
+    }
+  } else {
+    mejorProveedor.innerHTML = "";
   }
 }
 
@@ -320,5 +394,6 @@ window.onload = () => {
     entrarSistema();
   }
 };
+
 
 
