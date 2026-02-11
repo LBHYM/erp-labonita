@@ -158,13 +158,19 @@
       <div class="panel-header">
         <div>
           <h3>Análisis de Costos</h3>
-          <p>Visualiza el comportamiento del costo unitario por producto.</p>
+          <p>Consulta el costo por producto general o por proveedor.</p>
         </div>
         <span class="badge">Análisis</span>
       </div>
 
       <div class="toolbar">
-        <select id="selectorProducto" onchange="graficar()"></select>
+        <select id="selectorProducto" onchange="actualizarProveedoresDeProducto()"></select>
+        <select id="selectorProveedor" onchange="graficar()"></select>
+      </div>
+
+      <div class="hint">
+        <b>Modo:</b> Si eliges “Todos los proveedores”, verás el promedio general del producto.
+        Si eliges un proveedor, verás solo ese proveedor.
       </div>
 
       <div class="chart-wrap">
@@ -172,6 +178,7 @@
       </div>
 
       <div id="variacion" class="variation"></div>
+      <div id="mejorProveedor" class="best"></div>
     </section>
 
     <footer class="footer">
@@ -184,6 +191,8 @@
 <script src="script.js"></script>
 </body>
 </html>
+
+
 
 
 
