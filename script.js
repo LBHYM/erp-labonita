@@ -3,23 +3,33 @@ const URL_GOOGLE = "https://script.google.com/macros/s/AKfycbxVzDzyLA2pb2Zhsti1t
 let datos = [];
 let graficaActual = null;
 
-// Login
+// Login + edición
 let modoEdicion = false;
 let filaEditando = null;
 
-/* ================= LOGIN ================= */
+/* ================= LOGIN (CON SESION) ================= */
 
 function login() {
-  const user = document.getElementById("usuario").value;
-  const pass = document.getElementById("password").value;
+  const user = document.getElementById("usuario").value.trim();
+  const pass = document.getElementById("password").value.trim();
 
   if (user === "LBHYM" && pass === "LB16082025") {
-    document.getElementById("loginContainer").style.display = "none";
-    document.getElementById("sistema").style.display = "block";
-    cargarDatos();
+    localStorage.setItem("LB_LOGGED", "1");
+    entrarSistema();
   } else {
     document.getElementById("errorLogin").innerText = "Credenciales incorrectas";
   }
+}
+
+function entrarSistema() {
+  document.getElementById("loginContainer").style.display = "none";
+  document.getElementById("sistema").style.display = "block";
+  cargarDatos();
+}
+
+function logout() {
+  localStorage.removeItem("LB_LOGGED");
+  location.reload();
 }
 
 /* ================= CARGAR DATOS ================= */
@@ -58,7 +68,7 @@ function mostrar() {
     const fecha = fila[5] ? new Date(fila[5]).toLocaleDateString() : "";
     const notas = fila[6] || "";
 
-    const filaRealSheets = index + 2; // fila 1 = encabezados
+    const filaRealSheets = index + 2;
 
     tabla.innerHTML += `
       <tr>
@@ -70,11 +80,8 @@ function mostrar() {
         <td>${fecha}</td>
         <td>${notas}</td>
         <td>
-          <button style="background:#C29B40;color:white;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;"
-            onclick="cargarEdicion(${filaRealSheets}, ${index})">Editar</button>
-
-          <button style="background:#D38686;color:white;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;"
-            onclick="eliminar(${filaRealSheets})">Borrar</button>
+          <button class="btn-secondary" onclick="cargarEdicion(${filaRealSheets}, ${index})">Editar</button>
+          <button class="btn-danger" onclick="eliminar(${filaRealSheets})">Borrar</button>
         </td>
       </tr>
     `;
@@ -84,11 +91,6 @@ function mostrar() {
 /* ================= DASHBOARD ================= */
 
 function actualizarDashboard() {
-  const totalInvertido = document.getElementById("totalInvertido");
-  const totalCompras = document.getElementById("totalCompras");
-  const productoTop = document.getElementById("productoTop");
-  const promedioGeneral = document.getElementById("promedioGeneral");
-
   const registros = datos.slice(1);
 
   let total = 0;
@@ -105,8 +107,8 @@ function actualizarDashboard() {
     resumen[prod] += cant;
   });
 
-  totalInvertido.textContent = "$" + total.toFixed(2);
-  totalCompras.textContent = registros.length;
+  document.getElementById("totalInvertido").innerText = "$" + total.toFixed(2);
+  document.getElementById("totalCompras").innerText = registros.length;
 
   let top = "-";
   let max = 0;
@@ -117,8 +119,9 @@ function actualizarDashboard() {
     }
   });
 
-  productoTop.textContent = top;
-  promedioGeneral.textContent = "$" + (registros.length ? total / registros.length : 0).toFixed(2);
+  document.getElementById("productoTop").innerText = top;
+  document.getElementById("promedioGeneral").innerText =
+    "$" + (registros.length ? total / registros.length : 0).toFixed(2);
 }
 
 /* ================= GUARDAR / EDITAR ================= */
@@ -138,7 +141,6 @@ async function guardarRegistro() {
   }
 
   if (modoEdicion) {
-
     await fetch(URL_GOOGLE, {
       method: "POST",
       body: JSON.stringify({
@@ -157,7 +159,6 @@ async function guardarRegistro() {
     cancelarEdicion();
 
   } else {
-
     await fetch(URL_GOOGLE, {
       method: "POST",
       body: JSON.stringify({
@@ -312,7 +313,12 @@ function graficar() {
   }
 }
 
+/* ================= AUTO LOGIN ================= */
 
-
+window.onload = () => {
+  if (localStorage.getItem("LB_LOGGED") === "1") {
+    entrarSistema();
+  }
+};
 
 

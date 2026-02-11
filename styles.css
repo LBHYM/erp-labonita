@@ -1,75 +1,331 @@
-body {
-  font-family: 'Segoe UI', sans-serif;
-  background: #F9F9F9;
-  margin: 30px;
-  color: #5C4033;
+:root{
+  --cafe:#5C4033;
+  --dorado:#C29B40;
+  --verde:#A4C639;
+  --rosa:#D38686;
+  --fondo:#F9F9F9;
+  --blanco:#ffffff;
+  --gris:#777;
 }
 
-.login-box {
-  max-width: 350px;
-  margin: 100px auto;
-  background: white;
-  padding: 30px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  text-align: center;
+*{ box-sizing:border-box; }
+
+body{
+  margin:0;
+  font-family: "Segoe UI", sans-serif;
+  background: var(--fondo);
+  color: var(--cafe);
 }
 
-.login-box input {
-  width: 100%;
-  padding: 10px;
-  margin: 10px 0;
+/* ===== LOGIN ===== */
+.login-box{
+  max-width: 420px;
+  margin: 70px auto;
+  background: var(--blanco);
+  padding: 28px;
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.10);
+  text-align:center;
 }
 
-.login-box button {
-  width: 100%;
-  padding: 10px;
-  background: #A4C639;
-  border: none;
-  color: white;
-  cursor: pointer;
+.login-box h1{
+  margin:0;
+  font-size: 32px;
+  color: var(--cafe);
 }
 
-.dashboard {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin-bottom: 40px;
+.login-box .sub{
+  margin: 6px 0 18px;
+  color: var(--gris);
 }
 
-.card {
-  background: white;
-  padding: 20px;
-  flex: 1;
-  min-width: 200px;
-  border-left: 6px solid #C29B40;
+.login-box input{
+  width:100%;
+  padding: 12px 12px;
+  margin: 8px 0;
   border-radius: 10px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  border: 1px solid #e5e5e5;
+  font-size: 16px;
 }
 
-.modulo {
-  background: white;
-  padding: 25px;
+.login-box input:focus{
+  outline:none;
+  border-color: var(--verde);
+}
+
+.login-box button{
+  width:100%;
+  padding: 12px;
+  border-radius: 10px;
+  border:none;
+  background: var(--verde);
+  color:white;
+  font-weight: 700;
+  cursor:pointer;
+  font-size: 16px;
+  margin-top: 10px;
+}
+
+.error{
+  color: var(--rosa);
+  font-weight: 700;
+  margin-top: 12px;
+}
+
+/* ===== SISTEMA ===== */
+#sistema{
+  padding: 18px;
+  max-width: 1250px;
+  margin: 0 auto;
+}
+
+/* ===== TOPBAR ===== */
+.topbar{
+  background: var(--blanco);
+  border-radius: 16px;
+  padding: 18px 18px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.08);
+  display:flex;
+  justify-content: space-between;
+  align-items:center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.topbar h2{
+  margin:0;
+  font-size: 20px;
+}
+
+.topbar p{
+  margin:4px 0 0;
+  color: var(--gris);
+  font-size: 14px;
+}
+
+.logout{
+  border:none;
+  background: var(--cafe);
+  color:white;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor:pointer;
+  font-weight:700;
+}
+
+/* ===== DASHBOARD ===== */
+.dashboard{
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.card{
+  background: var(--blanco);
+  padding: 16px;
+  border-radius: 16px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.08);
+  border-left: 6px solid var(--dorado);
+}
+
+.card h4{
+  margin:0;
+  color: var(--gris);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.card p{
+  margin: 8px 0 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--cafe);
+}
+
+/* ===== MODULOS ===== */
+.modulo{
+  background: var(--blanco);
+  padding: 18px;
+  border-radius: 16px;
+  box-shadow: 0 8px 22px rgba(0,0,0,0.08);
+  margin-bottom: 18px;
+}
+
+.modulo-header{
+  display:flex;
+  justify-content: space-between;
+  align-items:center;
+  margin-bottom: 14px;
+}
+
+.modulo h3{
+  margin:0;
+  font-size: 18px;
+}
+
+.tag{
+  background: #f4f4f4;
+  color: var(--cafe);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* ===== FORM ===== */
+.formulario{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.campo label{
+  display:block;
+  font-size: 12px;
+  color: var(--gris);
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+
+.campo input{
+  width:100%;
+  padding: 12px 12px;
   border-radius: 12px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-  margin-bottom: 40px;
+  border: 1px solid #e5e5e5;
+  font-size: 15px;
 }
 
-table {
-  width: 100%;
-  margin-top: 20px;
+.campo input:focus{
+  outline:none;
+  border-color: var(--verde);
+}
+
+/* ===== BOTONES ===== */
+.botonera{
+  display:flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.btn-primary{
+  border:none;
+  background: var(--verde);
+  color:white;
+  padding: 12px 14px;
+  border-radius: 12px;
+  cursor:pointer;
+  font-weight: 800;
+}
+
+.btn-secondary{
+  border:none;
+  background: var(--dorado);
+  color:white;
+  padding: 12px 14px;
+  border-radius: 12px;
+  cursor:pointer;
+  font-weight: 800;
+}
+
+.btn-danger{
+  border:none;
+  background: var(--rosa);
+  color:white;
+  padding: 12px 14px;
+  border-radius: 12px;
+  cursor:pointer;
+  font-weight: 800;
+}
+
+/* ===== ACCIONES ===== */
+.acciones{
+  display:flex;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+  align-items:center;
+}
+
+.acciones input, .acciones select{
+  padding: 12px 12px;
+  border-radius: 12px;
+  border: 1px solid #e5e5e5;
+  font-size: 15px;
+  flex: 1;
+  min-width: 220px;
+}
+
+.acciones input:focus, .acciones select:focus{
+  outline:none;
+  border-color: var(--verde);
+}
+
+/* ===== TABLA ===== */
+.tabla-wrap{
+  margin-top: 14px;
+  overflow-x: auto;
+  border-radius: 14px;
+  border: 1px solid #eee;
+}
+
+table{
+  width:100%;
   border-collapse: collapse;
+  min-width: 950px;
 }
 
-th {
-  background: #5C4033;
-  color: white;
+th{
+  background: var(--cafe);
+  color:white;
+  padding: 12px;
+  font-size: 13px;
+  text-align:center;
+  position: sticky;
+  top: 0;
+}
+
+td{
   padding: 10px;
-}
-
-td {
-  padding: 8px;
-  text-align: center;
   border-bottom: 1px solid #eee;
+  text-align:center;
+  font-size: 14px;
 }
 
+tr:hover{
+  background: #fafafa;
+}
+
+/* ===== GRAFICA ===== */
+.grafica-wrap{
+  width:100%;
+  overflow-x:auto;
+}
+
+.variacion{
+  margin-top: 12px;
+  font-weight: 800;
+}
+
+/* ===== FOOTER ===== */
+.footer{
+  text-align:center;
+  padding: 16px;
+  color: var(--gris);
+  font-size: 13px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 980px){
+  #sistema{ padding: 14px; }
+  .dashboard{ grid-template-columns: repeat(2, 1fr); }
+  .formulario{ grid-template-columns: 1fr; }
+  .botonera{ flex-direction: column; }
+  .btn-primary,.btn-secondary,.btn-danger{ width:100%; }
+  .logout{ width:auto; }
+}
+
+@media (max-width: 480px){
+  .topbar{ flex-direction: column; align-items:flex-start; }
+  .dashboard{ grid-template-columns: 1fr; }
+}
