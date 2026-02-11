@@ -48,15 +48,20 @@ body{
   margin-bottom: 14px;
 }
 
-/* ===== LOGO LOGIN ===== */
+/* ===== LOGO LOGIN (SIN CUADRO BLANCO) ===== */
 .brand-logo{
-  width: 54px;
-  height: 54px;
+  width: 56px;
+  height: 56px;
   object-fit: contain;
-  border-radius: 14px;
-  border: 1px solid var(--borde);
-  background: white;
-  padding: 6px;
+  border-radius: 16px;
+
+  /* quitamos recuadro blanco */
+  background: transparent;
+  border: none;
+  padding: 0;
+
+  /* para que se vea pro aunque tenga fondo */
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.10));
 }
 
 .login-card h1{
@@ -131,15 +136,18 @@ body{
   gap: 12px;
 }
 
-/* ===== LOGO TOPBAR ===== */
+/* ===== LOGO TOPBAR (SIN CUADRO BLANCO) ===== */
 .topbar-logo{
   width: 42px;
   height: 42px;
   object-fit: contain;
-  border-radius: 14px;
-  border: 1px solid var(--borde);
-  background: white;
-  padding: 6px;
+  border-radius: 16px;
+
+  background: transparent;
+  border: none;
+  padding: 0;
+
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.10));
 }
 
 .topbar-title{
@@ -404,6 +412,8 @@ tr:hover{
   .grid-4{ grid-template-columns: 1fr; }
   .panel-header{ flex-direction: column; }
 }
+
+
 
 
 
