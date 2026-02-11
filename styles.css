@@ -33,7 +33,7 @@ body{
 
 .login-card{
   width: 100%;
-  max-width: 420px;
+  max-width: 440px;
   background: var(--card);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
@@ -48,11 +48,15 @@ body{
   margin-bottom: 14px;
 }
 
-.brand-dot{
-  width: 46px;
-  height: 46px;
+/* ===== LOGO LOGIN ===== */
+.brand-logo{
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
   border-radius: 14px;
-  background: linear-gradient(135deg, var(--dorado), var(--verde));
+  border: 1px solid var(--borde);
+  background: white;
+  padding: 6px;
 }
 
 .login-card h1{
@@ -127,11 +131,15 @@ body{
   gap: 12px;
 }
 
-.logo-mini{
+/* ===== LOGO TOPBAR ===== */
+.topbar-logo{
   width: 42px;
   height: 42px;
+  object-fit: contain;
   border-radius: 14px;
-  background: linear-gradient(135deg, var(--cafe), var(--dorado));
+  border: 1px solid var(--borde);
+  background: white;
+  padding: 6px;
 }
 
 .topbar-title{
@@ -396,5 +404,7 @@ tr:hover{
   .grid-4{ grid-template-columns: 1fr; }
   .panel-header{ flex-direction: column; }
 }
+
+
 
 
