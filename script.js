@@ -12,7 +12,7 @@ function login() {
   const user = document.getElementById("usuario").value.trim();
   const pass = document.getElementById("password").value.trim();
 
-  if (user === "LBHYM" && pass === "LB16082025") {
+  if (user === "LBHYM" && pass === "LB16082025.") {
     localStorage.setItem("LB_LOGGED", "1");
     entrarSistema();
   } else {
@@ -290,6 +290,7 @@ function cargarSelectorProductos() {
 
 function actualizarProveedoresDeProducto() {
   const producto = document.getElementB
+
 
 
 
