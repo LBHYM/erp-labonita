@@ -3,32 +3,28 @@ const URL_GOOGLE = "https://script.google.com/macros/s/AKfycbxVzDzyLA2pb2Zhsti1t
 let datos = [];
 let graficaActual = null;
 
+// Edición
 let modoEdicion = false;
-let filaEditando = null;
+let idEditando = null;
 
-/* ================= LOGIN ================= */
+/* ================= UTILIDADES ================= */
 
-function login() {
-  const user = document.getElementById("usuario").value.trim();
-  const pass = document.getElementById("password").value.trim();
+function money(n) {
+  const num = Number(n) || 0;
+  return "$" + num.toFixed(2);
+}
 
-  if (user === "LBHYM" && pass === "LB16082025.") {
-    localStorage.setItem("LB_LOGGED", "1");
-    entrarSistema();
-  } else {
-    document.getElementById("errorLogin").innerText = "Credenciales incorrectas";
+function safeStr(x) {
+  return (x ?? "").toString().trim();
+}
+
+function toDateInputValue(valor) {
+  if (!valor) return "";
+  try {
+    return new Date(valor).toISOString().split("T")[0];
+  } catch {
+    return "";
   }
-}
-
-function entrarSistema() {
-  document.getElementById("loginContainer").style.display = "none";
-  document.getElementById("sistema").style.display = "block";
-  cargarDatos();
-}
-
-function logout() {
-  localStorage.removeItem("LB_LOGGED");
-  location.reload();
 }
 
 /* ================= POST SEGURO ================= */
@@ -51,10 +47,46 @@ async function cargarDatos() {
 
   datos = json;
 
+  // Pintar todo
   mostrar();
   actualizarDashboard();
   cargarSelectorProductos();
   actualizarProveedoresDeProducto();
+
+  // Autocompletar
+  cargarAutocompletado();
+}
+
+/* ================= AUTOCOMPLETAR ================= */
+
+function cargarAutocompletado() {
+  const listaProductos = document.getElementById("listaProductos");
+  const listaProveedores = document.getElementById("listaProveedores");
+
+  listaProductos.innerHTML = "";
+  listaProveedores.innerHTML = "";
+
+  const registros = datos.slice(1);
+
+  const productos = [...new Set(registros.map(f => safeStr(f[2])))]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+
+  const proveedores = [...new Set(registros.map(f => safeStr(f[1])))]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+
+  productos.forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p;
+    listaProductos.appendChild(opt);
+  });
+
+  proveedores.forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p;
+    listaProveedores.appendChild(opt);
+  });
 }
 
 /* ================= MOSTRAR TABLA ================= */
@@ -62,47 +94,48 @@ async function cargarDatos() {
 function mostrar() {
   const tabla = document.getElementById("tabla");
   const filtro = document.getElementById("buscador").value.toLowerCase();
+
   tabla.innerHTML = "";
 
-  datos.slice(1).forEach((fila, index) => {
+  // ORDEN CON ID:
+  // 0 ID
+  // 1 PROVEEDOR
+  // 2 PRODUCTO
+  // 3 CANTIDAD
+  // 4 COSTO
+  // 5 TOTAL
+  // 6 FECHA
+  // 7 NOTAS
 
-    // ORDEN REAL (SIN ID):
-    // 0 PROVEEDOR
-    // 1 PRODUCTO
-    // 2 CANTIDAD
-    // 3 COSTO
-    // 4 TOTAL
-    // 5 FECHA
-    // 6 NOTAS
+  datos.slice(1).forEach((fila) => {
 
-    const proveedor = (fila[0] || "").toString();
-    const producto = (fila[1] || "").toString();
+    const id = safeStr(fila[0]);
+    const proveedor = safeStr(fila[1]);
+    const producto = safeStr(fila[2]);
 
     if (
       !proveedor.toLowerCase().includes(filtro) &&
       !producto.toLowerCase().includes(filtro)
     ) return;
 
-    const cantidad = Number(fila[2]) || 0;
-    const costo = Number(fila[3]) || 0;
-    const total = Number(fila[4]) || 0;
-    const fecha = fila[5] ? new Date(fila[5]).toLocaleDateString() : "";
-    const notas = fila[6] || "";
-
-    const filaRealSheets = index + 2;
+    const cantidad = Number(fila[3]) || 0;
+    const costo = Number(fila[4]) || 0;
+    const total = Number(fila[5]) || 0;
+    const fecha = fila[6] ? new Date(fila[6]).toLocaleDateString() : "";
+    const notas = safeStr(fila[7]);
 
     tabla.innerHTML += `
       <tr>
         <td>${proveedor}</td>
         <td>${producto}</td>
         <td>${cantidad}</td>
-        <td>$${costo.toFixed(2)}</td>
-        <td>$${total.toFixed(2)}</td>
+        <td>${money(costo)}</td>
+        <td>${money(total)}</td>
         <td>${fecha}</td>
         <td>${notas}</td>
         <td class="acciones">
-          <button class="btn-mini btn-edit" onclick="cargarEdicion(${filaRealSheets}, ${index})">Editar</button>
-          <button class="btn-mini btn-del" onclick="eliminar(${filaRealSheets})">Borrar</button>
+          <button class="btn-mini btn-edit" onclick="cargarEdicion('${id}')">Editar</button>
+          <button class="btn-mini btn-del" onclick="eliminar('${id}')">Borrar</button>
         </td>
       </tr>
     `;
@@ -114,77 +147,83 @@ function mostrar() {
 function actualizarDashboard() {
   const registros = datos.slice(1);
 
-  let total = 0;
-  let resumen = {};
+  let totalInvertido = 0;
+  let totalCompras = registros.length;
+
+  // Para producto top
+  let resumenCantidad = {};
 
   registros.forEach(fila => {
-    const prod = fila[1];
-    const cant = Number(fila[2]) || 0;
-    const tot = Number(fila[4]) || 0;
+    const producto = safeStr(fila[2]);
+    const cantidad = Number(fila[3]) || 0;
+    const total = Number(fila[5]) || 0;
 
-    total += tot;
+    totalInvertido += total;
 
-    if (!resumen[prod]) resumen[prod] = 0;
-    resumen[prod] += cant;
+    if (!resumenCantidad[producto]) resumenCantidad[producto] = 0;
+    resumenCantidad[producto] += cantidad;
   });
 
-  document.getElementById("totalInvertido").innerText = "$" + total.toFixed(2);
-  document.getElementById("totalCompras").innerText = registros.length;
+  document.getElementById("totalInvertido").innerText = money(totalInvertido);
+  document.getElementById("totalCompras").innerText = totalCompras;
 
   let top = "-";
   let max = 0;
-  Object.keys(resumen).forEach(p => {
-    if (resumen[p] > max) {
-      max = resumen[p];
+  Object.keys(resumenCantidad).forEach(p => {
+    if (resumenCantidad[p] > max) {
+      max = resumenCantidad[p];
       top = p;
     }
   });
 
   document.getElementById("productoTop").innerText = top;
 
-  const promedioGeneral = registros.length ? total / registros.length : 0;
-  document.getElementById("promedioGeneral").innerText = "$" + promedioGeneral.toFixed(2);
+  const promedioGeneral = totalCompras ? totalInvertido / totalCompras : 0;
+  document.getElementById("promedioGeneral").innerText = money(promedioGeneral);
 }
 
 /* ================= GUARDAR / EDITAR ================= */
 
 async function guardarRegistro() {
+  const proveedor = safeStr(document.getElementById("proveedor").value);
+  const producto = safeStr(document.getElementById("producto").value);
 
-  const proveedor = document.getElementById("proveedor").value.trim();
-  const producto = document.getElementById("producto").value.trim();
   const cantidad = Number(document.getElementById("cantidad").value);
   const costo = Number(document.getElementById("costo").value);
+
   const fecha = document.getElementById("fecha").value;
-  const notas = document.getElementById("notas").value.trim();
+  const notas = safeStr(document.getElementById("notas").value);
 
   if (!proveedor || !producto || !cantidad || !costo || !fecha) {
     alert("Completa los campos obligatorios");
     return;
   }
 
+  const total = cantidad * costo;
+
   if (modoEdicion) {
     await postGoogle({
       accion: "editar",
-      fila: filaEditando,
+      id: idEditando,
       proveedor,
       producto,
       cantidad,
       costo,
-      total: cantidad * costo,
+      total,
       fecha,
       notas
     });
 
     cancelarEdicion();
-
   } else {
     await postGoogle({
       accion: "agregar",
+      id: Date.now().toString(),
       proveedor,
       producto,
       cantidad,
       costo,
-      total: cantidad * costo,
+      total,
       fecha,
       notas
     });
@@ -197,22 +236,20 @@ async function guardarRegistro() {
 
 /* ================= CARGAR EDICION ================= */
 
-function cargarEdicion(filaRealSheets, index) {
+function cargarEdicion(id) {
+  const registros = datos.slice(1);
+  const fila = registros.find(f => safeStr(f[0]) === safeStr(id));
+  if (!fila) return;
 
-  const fila = datos[index + 1];
-
-  document.getElementById("proveedor").value = fila[0] || "";
-  document.getElementById("producto").value = fila[1] || "";
-  document.getElementById("cantidad").value = fila[2] || "";
-  document.getElementById("costo").value = fila[3] || "";
-
-  const fecha = fila[5] ? fila[5].toString().split("T")[0] : "";
-  document.getElementById("fecha").value = fecha;
-
-  document.getElementById("notas").value = fila[6] || "";
+  document.getElementById("proveedor").value = safeStr(fila[1]);
+  document.getElementById("producto").value = safeStr(fila[2]);
+  document.getElementById("cantidad").value = fila[3] ?? "";
+  document.getElementById("costo").value = fila[4] ?? "";
+  document.getElementById("fecha").value = toDateInputValue(fila[6]);
+  document.getElementById("notas").value = safeStr(fila[7]);
 
   modoEdicion = true;
-  filaEditando = filaRealSheets;
+  idEditando = safeStr(id);
 
   document.getElementById("btnGuardar").innerText = "Actualizar";
   document.getElementById("btnCancelar").style.display = "inline-block";
@@ -223,7 +260,7 @@ function cargarEdicion(filaRealSheets, index) {
 
 function cancelarEdicion() {
   modoEdicion = false;
-  filaEditando = null;
+  idEditando = null;
 
   limpiarFormulario();
 
@@ -243,14 +280,14 @@ function limpiarFormulario() {
   document.getElementById("notas").value = "";
 }
 
-/* ================= ELIMINAR ================= */
+/* ================= ELIMINAR (POR ID) ================= */
 
-async function eliminar(filaRealSheets) {
+async function eliminar(id) {
   if (!confirm("¿Seguro que deseas borrar este registro?")) return;
 
   await postGoogle({
     accion: "eliminar",
-    fila: filaRealSheets
+    id: safeStr(id)
   });
 
   cargarDatos();
@@ -260,13 +297,14 @@ async function eliminar(filaRealSheets) {
 
 function exportarExcel() {
   const exportar = datos.slice(1).map(f => ({
-    Proveedor: f[0],
-    Producto: f[1],
-    Cantidad: f[2],
-    Costo: f[3],
-    Total: f[4],
-    Fecha: f[5],
-    Notas: f[6]
+    ID: f[0],
+    Proveedor: f[1],
+    Producto: f[2],
+    Cantidad: f[3],
+    Costo: f[4],
+    Total: f[5],
+    Fecha: f[6],
+    Notas: f[7]
   }));
 
   const hoja = XLSX.utils.json_to_sheet(exportar);
@@ -281,7 +319,9 @@ function cargarSelectorProductos() {
   const selectorProducto = document.getElementById("selectorProducto");
   selectorProducto.innerHTML = "";
 
-  const productos = [...new Set(datos.slice(1).map(f => f[1]))].filter(Boolean);
+  const productos = [...new Set(datos.slice(1).map(f => safeStr(f[2])))]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
 
   productos.forEach(p => {
     selectorProducto.innerHTML += `<option value="${p}">${p}</option>`;
@@ -289,7 +329,128 @@ function cargarSelectorProductos() {
 }
 
 function actualizarProveedoresDeProducto() {
-  const producto = document.getElementB
+  const producto = document.getElementById("selectorProducto").value;
+  const selectorProveedor = document.getElementById("selectorProveedor");
+
+  const proveedores = [...new Set(
+    datos.slice(1)
+      .filter(f => safeStr(f[2]) === safeStr(producto))
+      .map(f => safeStr(f[1]))
+  )].filter(Boolean).sort((a, b) => a.localeCompare(b));
+
+  selectorProveedor.innerHTML = `<option value="__TODOS__">Todos los proveedores</option>`;
+
+  proveedores.forEach(p => {
+    selectorProveedor.innerHTML += `<option value="${p}">${p}</option>`;
+  });
+
+  graficar();
+}
+
+/* ================= GRAFICA + RESUMEN ================= */
+
+function graficar() {
+  const prod = document.getElementById("selectorProducto").value;
+  const prov = document.getElementById("selectorProveedor").value;
+
+  const variacion = document.getElementById("variacion");
+  const mejorProveedor = document.getElementById("mejorProveedor");
+
+  let historial = datos.slice(1).filter(f => safeStr(f[2]) === safeStr(prod));
+
+  if (prov !== "__TODOS__") {
+    historial = historial.filter(f => safeStr(f[1]) === safeStr(prov));
+  }
+
+  historial.sort((a, b) => new Date(a[6]) - new Date(b[6]));
+
+  const labels = historial.map(f => new Date(f[6]).toLocaleDateString());
+  const precios = historial.map(f => Number(f[4]) || 0);
+
+  if (graficaActual) graficaActual.destroy();
+
+  graficaActual = new Chart(document.getElementById("grafica"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: prov === "__TODOS__" ? `Costo general: ${prod}` : `Costo ${prov}: ${prod}`,
+        data: precios,
+        borderColor: "#C29B40",
+        fill: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false
+    }
+  });
+
+  if (precios.length === 0) {
+    variacion.innerText = "Sin datos para este filtro.";
+  } else {
+    const ultimo = precios[precios.length - 1];
+    const promedio = precios.reduce((a, b) => a + b, 0) / precios.length;
+
+    let texto = `📌 Último costo: ${money(ultimo)} • Promedio: ${money(promedio)}`;
+
+    if (precios.length >= 2) {
+      const diff = ultimo - precios[precios.length - 2];
+      texto += diff > 0 ? ` • 🔺 Subió ${money(diff)}`
+        : diff < 0 ? ` • 🔻 Bajó ${money(Math.abs(diff))}`
+        : ` • ➖ Sin cambio`;
+    }
+
+    variacion.innerText = texto;
+  }
+
+  // Mejor proveedor SOLO si está en TODOS
+  if (prov === "__TODOS__") {
+    const porProveedor = {};
+
+    datos.slice(1)
+      .filter(f => safeStr(f[2]) === safeStr(prod))
+      .forEach(f => {
+        const proveedor = safeStr(f[1]);
+        const cantidad = Number(f[3]) || 0;
+        const total = Number(f[5]) || 0;
+
+        if (!porProveedor[proveedor]) {
+          porProveedor[proveedor] = { cantidad: 0, total: 0 };
+        }
+
+        porProveedor[proveedor].cantidad += cantidad;
+        porProveedor[proveedor].total += total;
+      });
+
+    let mejor = null;
+    let mejorProm = Infinity;
+
+    Object.keys(porProveedor).forEach(p => {
+      const cant = porProveedor[p].cantidad;
+      const prom = cant ? porProveedor[p].total / cant : Infinity;
+
+      if (prom < mejorProm) {
+        mejorProm = prom;
+        mejor = p;
+      }
+    });
+
+    if (mejor) {
+      mejorProveedor.innerHTML = `🏆 <b>Mejor proveedor para "${prod}"</b>: ${mejor} (Promedio ponderado: ${money(mejorProm)})`;
+    } else {
+      mejorProveedor.innerHTML = "";
+    }
+  } else {
+    mejorProveedor.innerHTML = "";
+  }
+}
+
+/* ================= INICIO ================= */
+
+window.onload = () => {
+  cargarDatos();
+};
 
 
 
