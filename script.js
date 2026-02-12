@@ -1,4 +1,4 @@
-const URL_GOOGLE = "https://script.google.com/macros/s/AKfycbxVzDzyLA2pb2Zhsti1ttd9SpLt79ldnCdLGjoDxlgKSuDFRTw1ssWdFsY9xnu-5rLAow/exec";
+const URL_GOOGLE = "https://script.google.com/macros/s/AKfycbwcf0RyTKrZFfk9vGgRtPktHaiu7jAkqX-gX2HK9F1nMQgcq_F3it_Tm_rBHd9ckVzGdA/exec";
 
 let datos = [];
 let graficaActual = null;
@@ -521,6 +521,7 @@ function graficar() {
 window.onload = () => {
   cargarDatos();
 };
+
 
 
 
