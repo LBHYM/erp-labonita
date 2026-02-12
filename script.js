@@ -1,4 +1,5 @@
-const URL_GOOGLE = "https://script.google.com/macros/s/AKfycbwcf0RyTKrZFfk9vGgRtPktHaiu7jAkqX-gX2HK9F1nMQgcq_F3it_Tm_rBHd9ckVzGdA/exec";
+const URL_GOOGLE =
+  "https://script.google.com/macros/s/AKfycbxVzDzyLA2pb2Zhsti1ttd9SpLt79ldnCdLGjoDxlgKSuDFRTw1ssWdFsY9xnu-5rLAow/exec";
 
 let datos = [];
 let graficaActual = null;
@@ -45,9 +46,9 @@ function safeDateDisplay(valor) {
   }
 }
 
-/* ================= LIMPIAR FILAS ROTAS ================= */
+/* ================= NORMALIZAR FILA ================= */
 /*
-  Esperamos siempre 8 columnas:
+  Orden esperado (8 columnas):
   [0] ID
   [1] PROVEEDOR
   [2] PRODUCTO
@@ -60,43 +61,36 @@ function safeDateDisplay(valor) {
 function normalizarFila(fila) {
   if (!Array.isArray(fila)) return null;
 
-  // Rellenar faltantes
   const f = [...fila];
-  while (f.length < 8) f.push("");
 
-  // Cortar extras
+  while (f.length < 8) f.push("");
   if (f.length > 8) f.length = 8;
 
-  // Si no tiene ID, no sirve
   const id = safeStr(f[0]);
   if (!id || id.toLowerCase() === "id") return null;
 
-  // Proveedor y producto deben ser texto
   const proveedor = safeStr(f[1]);
   const producto = safeStr(f[2]);
 
-  // Si proveedor o producto están vacíos, ignoramos
   if (!proveedor || !producto) return null;
 
-  // Convertir números
   const cantidad = safeNum(f[3]);
   const costo = safeNum(f[4]);
   const total = safeNum(f[5]);
 
-  // Fecha
   const fecha = f[6] || "";
   const notas = safeStr(f[7]);
 
   return [id, proveedor, producto, cantidad, costo, total, fecha, notas];
 }
 
-/* ================= POST SEGURO ================= */
+/* ================= POST GOOGLE ================= */
 
 async function postGoogle(payload) {
   const res = await fetch(URL_GOOGLE, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
 
   return await res.json().catch(() => ({}));
@@ -105,37 +99,29 @@ async function postGoogle(payload) {
 /* ================= CARGAR DATOS ================= */
 
 async function cargarDatos() {
-  try {
-    const res = await fetch(URL_GOOGLE);
-    const json = await res.json();
+  const res = await fetch(URL_GOOGLE);
+  const json = await res.json();
 
-    if (!Array.isArray(json)) {
-      alert("Error: Google Sheets no devolvió datos válidos.");
-      return;
-    }
-
-    // Encabezados + filas limpias
-    const header = json[0];
-    const filas = json.slice(1);
-
-    const limpias = filas
-      .map(normalizarFila)
-      .filter(Boolean);
-
-    datos = [header, ...limpias];
-
-    mostrar();
-    actualizarDashboard();
-    cargarSelectorProductos();
-    actualizarProveedoresDeProducto();
-    cargarAutocompletado();
-  } catch (err) {
-    console.error(err);
-    alert("No se pudo cargar la información. Revisa tu Apps Script.");
+  if (!Array.isArray(json)) {
+    alert("Google Sheets no devolvió datos válidos.");
+    return;
   }
+
+  const header = json[0];
+  const filas = json.slice(1);
+
+  const limpias = filas.map(normalizarFila).filter(Boolean);
+
+  datos = [header, ...limpias];
+
+  mostrar();
+  actualizarDashboard();
+  cargarSelectorProductos();
+  actualizarProveedoresDeProducto();
+  cargarAutocompletado();
 }
 
-/* ================= AUTOCOMPLETAR ================= */
+/* ================= AUTOCOMPLETADO ================= */
 
 function cargarAutocompletado() {
   const listaProductos = document.getElementById("listaProductos");
@@ -148,21 +134,21 @@ function cargarAutocompletado() {
 
   const registros = datos.slice(1);
 
-  const productos = [...new Set(registros.map(f => safeStr(f[2])))]
+  const productos = [...new Set(registros.map((f) => safeStr(f[2])))]
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b));
 
-  const proveedores = [...new Set(registros.map(f => safeStr(f[1])))]
+  const proveedores = [...new Set(registros.map((f) => safeStr(f[1])))]
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b));
 
-  productos.forEach(p => {
+  productos.forEach((p) => {
     const opt = document.createElement("option");
     opt.value = p;
     listaProductos.appendChild(opt);
   });
 
-  proveedores.forEach(p => {
+  proveedores.forEach((p) => {
     const opt = document.createElement("option");
     opt.value = p;
     listaProveedores.appendChild(opt);
@@ -181,7 +167,6 @@ function mostrar() {
   tabla.innerHTML = "";
 
   datos.slice(1).forEach((fila) => {
-
     const id = safeStr(fila[0]);
     const proveedor = safeStr(fila[1]);
     const producto = safeStr(fila[2]);
@@ -189,7 +174,8 @@ function mostrar() {
     if (
       !proveedor.toLowerCase().includes(filtro) &&
       !producto.toLowerCase().includes(filtro)
-    ) return;
+    )
+      return;
 
     const cantidad = safeNum(fila[3]);
     const costo = safeNum(fila[4]);
@@ -207,11 +193,20 @@ function mostrar() {
         <td>${fecha}</td>
         <td>${notas}</td>
         <td class="acciones">
-          <button class="btn-mini btn-edit" onclick="cargarEdicion('${id}')">Editar</button>
-          <button class="btn-mini btn-del" onclick="eliminar('${id}')">Borrar</button>
+          <button class="btn-mini btn-edit" data-id="${id}">Editar</button>
+          <button class="btn-mini btn-del" data-id="${id}">Borrar</button>
         </td>
       </tr>
     `;
+  });
+
+  // Eventos (IMPORTANTE para que NO se rompan)
+  document.querySelectorAll(".btn-edit").forEach((btn) => {
+    btn.onclick = () => cargarEdicion(btn.dataset.id);
+  });
+
+  document.querySelectorAll(".btn-del").forEach((btn) => {
+    btn.onclick = () => eliminar(btn.dataset.id);
   });
 }
 
@@ -225,7 +220,7 @@ function actualizarDashboard() {
 
   let resumenCantidad = {};
 
-  registros.forEach(fila => {
+  registros.forEach((fila) => {
     const producto = safeStr(fila[2]);
     const cantidad = safeNum(fila[3]);
     const total = safeNum(fila[5]);
@@ -241,7 +236,8 @@ function actualizarDashboard() {
 
   let top = "-";
   let max = 0;
-  Object.keys(resumenCantidad).forEach(p => {
+
+  Object.keys(resumenCantidad).forEach((p) => {
     if (resumenCantidad[p] > max) {
       max = resumenCantidad[p];
       top = p;
@@ -283,7 +279,7 @@ async function guardarRegistro() {
       costo,
       total,
       fecha,
-      notas
+      notas,
     });
 
     cancelarEdicion();
@@ -297,20 +293,20 @@ async function guardarRegistro() {
       costo,
       total,
       fecha,
-      notas
+      notas,
     });
 
     limpiarFormulario();
   }
 
-  cargarDatos();
+  await cargarDatos();
 }
 
 /* ================= CARGAR EDICION ================= */
 
 function cargarEdicion(id) {
   const registros = datos.slice(1);
-  const fila = registros.find(f => safeStr(f[0]) === safeStr(id));
+  const fila = registros.find((f) => safeStr(f[0]) === safeStr(id));
   if (!fila) return;
 
   document.getElementById("proveedor").value = safeStr(fila[1]);
@@ -352,23 +348,23 @@ function limpiarFormulario() {
   document.getElementById("notas").value = "";
 }
 
-/* ================= ELIMINAR (POR ID) ================= */
+/* ================= ELIMINAR ================= */
 
 async function eliminar(id) {
   if (!confirm("¿Seguro que deseas borrar este registro?")) return;
 
   await postGoogle({
     accion: "eliminar",
-    id: safeStr(id)
+    id: safeStr(id),
   });
 
-  cargarDatos();
+  await cargarDatos();
 }
 
 /* ================= EXPORTAR ================= */
 
 function exportarExcel() {
-  const exportar = datos.slice(1).map(f => ({
+  const exportar = datos.slice(1).map((f) => ({
     ID: f[0],
     Proveedor: f[1],
     Producto: f[2],
@@ -376,7 +372,7 @@ function exportarExcel() {
     Costo: f[4],
     Total: f[5],
     Fecha: f[6],
-    Notas: f[7]
+    Notas: f[7],
   }));
 
   const hoja = XLSX.utils.json_to_sheet(exportar);
@@ -393,11 +389,11 @@ function cargarSelectorProductos() {
 
   selectorProducto.innerHTML = "";
 
-  const productos = [...new Set(datos.slice(1).map(f => safeStr(f[2])))]
+  const productos = [...new Set(datos.slice(1).map((f) => safeStr(f[2])))]
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b));
 
-  productos.forEach(p => {
+  productos.forEach((p) => {
     selectorProducto.innerHTML += `<option value="${p}">${p}</option>`;
   });
 }
@@ -410,22 +406,27 @@ function actualizarProveedoresDeProducto() {
 
   const producto = selectorProducto.value;
 
-  const proveedores = [...new Set(
-    datos.slice(1)
-      .filter(f => safeStr(f[2]) === safeStr(producto))
-      .map(f => safeStr(f[1]))
-  )].filter(Boolean).sort((a, b) => a.localeCompare(b));
+  const proveedores = [
+    ...new Set(
+      datos
+        .slice(1)
+        .filter((f) => safeStr(f[2]) === safeStr(producto))
+        .map((f) => safeStr(f[1]))
+    ),
+  ]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
 
   selectorProveedor.innerHTML = `<option value="__TODOS__">Todos los proveedores</option>`;
 
-  proveedores.forEach(p => {
+  proveedores.forEach((p) => {
     selectorProveedor.innerHTML += `<option value="${p}">${p}</option>`;
   });
 
   graficar();
 }
 
-/* ================= GRAFICA + RESUMEN ================= */
+/* ================= GRAFICA ================= */
 
 function graficar() {
   const prod = document.getElementById("selectorProducto").value;
@@ -434,16 +435,16 @@ function graficar() {
   const variacion = document.getElementById("variacion");
   const mejorProveedor = document.getElementById("mejorProveedor");
 
-  let historial = datos.slice(1).filter(f => safeStr(f[2]) === safeStr(prod));
+  let historial = datos.slice(1).filter((f) => safeStr(f[2]) === safeStr(prod));
 
   if (prov !== "__TODOS__") {
-    historial = historial.filter(f => safeStr(f[1]) === safeStr(prov));
+    historial = historial.filter((f) => safeStr(f[1]) === safeStr(prov));
   }
 
   historial.sort((a, b) => new Date(a[6]) - new Date(b[6]));
 
-  const labels = historial.map(f => safeDateDisplay(f[6]));
-  const precios = historial.map(f => safeNum(f[4]));
+  const labels = historial.map((f) => safeDateDisplay(f[6]));
+  const precios = historial.map((f) => safeNum(f[4]));
 
   if (graficaActual) graficaActual.destroy();
 
@@ -451,17 +452,22 @@ function graficar() {
     type: "line",
     data: {
       labels,
-      datasets: [{
-        label: prov === "__TODOS__" ? `Costo general: ${prod}` : `Costo ${prov}: ${prod}`,
-        data: precios,
-        borderColor: "#C29B40",
-        fill: false
-      }]
+      datasets: [
+        {
+          label:
+            prov === "__TODOS__"
+              ? `Costo general: ${prod}`
+              : `Costo ${prov}: ${prod}`,
+          data: precios,
+          borderColor: "#C29B40",
+          fill: false,
+        },
+      ],
     },
     options: {
       responsive: true,
-      maintainAspectRatio: false
-    }
+      maintainAspectRatio: false,
+    },
   });
 
   if (precios.length === 0) {
@@ -469,17 +475,19 @@ function graficar() {
   } else {
     const ultimo = precios[precios.length - 1];
     const promedio = precios.reduce((a, b) => a + b, 0) / precios.length;
-
-    variacion.innerText = `📌 Último costo: ${money(ultimo)} • Promedio: ${money(promedio)}`;
+    variacion.innerText = `📌 Último costo: ${money(ultimo)} • Promedio: ${money(
+      promedio
+    )}`;
   }
 
-  // Mejor proveedor
+  // Mejor proveedor (ponderado)
   if (prov === "__TODOS__") {
     const porProveedor = {};
 
-    datos.slice(1)
-      .filter(f => safeStr(f[2]) === safeStr(prod))
-      .forEach(f => {
+    datos
+      .slice(1)
+      .filter((f) => safeStr(f[2]) === safeStr(prod))
+      .forEach((f) => {
         const proveedor = safeStr(f[1]);
         const cantidad = safeNum(f[3]);
         const total = safeNum(f[5]);
@@ -495,7 +503,7 @@ function graficar() {
     let mejor = null;
     let mejorProm = Infinity;
 
-    Object.keys(porProveedor).forEach(p => {
+    Object.keys(porProveedor).forEach((p) => {
       const cant = porProveedor[p].cantidad;
       const prom = cant ? porProveedor[p].total / cant : Infinity;
 
@@ -506,8 +514,9 @@ function graficar() {
     });
 
     if (mejor) {
-      mejorProveedor.innerHTML =
-        `🏆 <b>Mejor proveedor para "${prod}"</b>: ${mejor} (Promedio ponderado: ${money(mejorProm)})`;
+      mejorProveedor.innerHTML = `🏆 <b>Mejor proveedor para "${prod}"</b>: ${mejor} (Promedio ponderado: ${money(
+        mejorProm
+      )})`;
     } else {
       mejorProveedor.innerHTML = "";
     }
@@ -516,10 +525,33 @@ function graficar() {
   }
 }
 
+/* ================= EVENTOS ================= */
+
+function conectarEventos() {
+  // Botón guardar
+  document.getElementById("btnGuardar").onclick = guardarRegistro;
+
+  // Cancelar
+  document.getElementById("btnCancelar").onclick = cancelarEdicion;
+
+  // Buscar
+  document.getElementById("buscador").onkeyup = mostrar;
+
+  // Exportar
+  document.getElementById("btnExportar").onclick = exportarExcel;
+
+  // Selectores análisis
+  document.getElementById("selectorProducto").onchange =
+    actualizarProveedoresDeProducto;
+
+  document.getElementById("selectorProveedor").onchange = graficar;
+}
+
 /* ================= INICIO ================= */
 
-window.onload = () => {
-  cargarDatos();
+window.onload = async () => {
+  conectarEventos();
+  await cargarDatos();
 };
 
 
