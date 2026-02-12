@@ -18,443 +18,63 @@ function safeStr(x) {
   return (x ?? "").toString().trim();
 }
 
-function toDateInputValue(valor) {
+function safeNum(x) {
+  const n = Number(x);
+  return isNaN(n) ? 0 : n;
+}
+
+function safeDateISO(valor) {
   if (!valor) return "";
   try {
-    return new Date(valor).toISOString().split("T")[0];
+    const d = new Date(valor);
+    if (isNaN(d.getTime())) return "";
+    return d.toISOString().split("T")[0];
   } catch {
     return "";
   }
 }
 
-/* ================= POST SEGURO ================= */
-
-async function postGoogle(payload) {
-  const res = await fetch(URL_GOOGLE, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-
-  return await res.json().catch(() => ({}));
-}
-
-/* ================= CARGAR DATOS ================= */
-
-async function cargarDatos() {
-  const res = await fetch(URL_GOOGLE);
-  const json = await res.json();
-
-  datos = json;
-
-  mostrar();
-  actualizarDashboard();
-  cargarSelectorProductos();
-  actualizarProveedoresDeProducto();
-  cargarAutocompletado();
-}
-
-/* ================= AUTOCOMPLETAR ================= */
-
-function cargarAutocompletado() {
-  const listaProductos = document.getElementById("listaProductos");
-  const listaProveedores = document.getElementById("listaProveedores");
-
-  if (!listaProductos || !listaProveedores) return;
-
-  listaProductos.innerHTML = "";
-  listaProveedores.innerHTML = "";
-
-  const registros = datos.slice(1);
-
-  const productos = [...new Set(registros.map(f => safeStr(f[2])))]
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
-
-  const proveedores = [...new Set(registros.map(f => safeStr(f[1])))]
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
-
-  productos.forEach(p => {
-    const opt = document.createElement("option");
-    opt.value = p;
-    listaProductos.appendChild(opt);
-  });
-
-  proveedores.forEach(p => {
-    const opt = document.createElement("option");
-    opt.value = p;
-    listaProveedores.appendChild(opt);
-  });
-}
-
-/* ================= MOSTRAR TABLA ================= */
-
-function mostrar() {
-  const tabla = document.getElementById("tabla");
-  const buscador = document.getElementById("buscador");
-
-  if (!tabla || !buscador) return;
-
-  const filtro = buscador.value.toLowerCase();
-  tabla.innerHTML = "";
-
-  // ORDEN CON ID:
-  // 0 ID
-  // 1 PROVEEDOR
-  // 2 PRODUCTO
-  // 3 CANTIDAD
-  // 4 COSTO
-  // 5 TOTAL
-  // 6 FECHA
-  // 7 NOTAS
-
-  datos.slice(1).forEach((fila) => {
-
-    const id = safeStr(fila[0]);
-    const proveedor = safeStr(fila[1]);
-    const producto = safeStr(fila[2]);
-
-    if (
-      !proveedor.toLowerCase().includes(filtro) &&
-      !producto.toLowerCase().includes(filtro)
-    ) return;
-
-    const cantidad = Number(fila[3]) || 0;
-    const costo = Number(fila[4]) || 0;
-    const total = Number(fila[5]) || 0;
-    const fecha = fila[6] ? new Date(fila[6]).toLocaleDateString() : "";
-    const notas = safeStr(fila[7]);
-
-    tabla.innerHTML += `
-      <tr>
-        <td>${proveedor}</td>
-        <td>${producto}</td>
-        <td>${cantidad}</td>
-        <td>${money(costo)}</td>
-        <td>${money(total)}</td>
-        <td>${fecha}</td>
-        <td>${notas}</td>
-        <td class="acciones">
-          <button class="btn-mini btn-edit" onclick="cargarEdicion('${id}')">Editar</button>
-          <button class="btn-mini btn-del" onclick="eliminar('${id}')">Borrar</button>
-        </td>
-      </tr>
-    `;
-  });
-}
-
-/* ================= DASHBOARD ================= */
-
-function actualizarDashboard() {
-  const registros = datos.slice(1);
-
-  let totalInvertido = 0;
-  let totalCompras = registros.length;
-
-  let resumenCantidad = {};
-
-  registros.forEach(fila => {
-    const producto = safeStr(fila[2]);
-    const cantidad = Number(fila[3]) || 0;
-    const total = Number(fila[5]) || 0;
-
-    totalInvertido += total;
-
-    if (!resumenCantidad[producto]) resumenCantidad[producto] = 0;
-    resumenCantidad[producto] += cantidad;
-  });
-
-  document.getElementById("totalInvertido").innerText = money(totalInvertido);
-  document.getElementById("totalCompras").innerText = totalCompras;
-
-  let top = "-";
-  let max = 0;
-  Object.keys(resumenCantidad).forEach(p => {
-    if (resumenCantidad[p] > max) {
-      max = resumenCantidad[p];
-      top = p;
-    }
-  });
-
-  document.getElementById("productoTop").innerText = top;
-
-  const promedioGeneral = totalCompras ? totalInvertido / totalCompras : 0;
-  document.getElementById("promedioGeneral").innerText = money(promedioGeneral);
-}
-
-/* ================= GUARDAR / EDITAR ================= */
-
-async function guardarRegistro() {
-  const proveedor = safeStr(document.getElementById("proveedor").value);
-  const producto = safeStr(document.getElementById("producto").value);
-
-  const cantidad = Number(document.getElementById("cantidad").value);
-  const costo = Number(document.getElementById("costo").value);
-
-  const fecha = document.getElementById("fecha").value;
-  const notas = safeStr(document.getElementById("notas").value);
-
-  if (!proveedor || !producto || !cantidad || !costo || !fecha) {
-    alert("Completa los campos obligatorios");
-    return;
-  }
-
-  const total = cantidad * costo;
-
-  if (modoEdicion) {
-    await postGoogle({
-      accion: "editar",
-      id: idEditando,
-      proveedor,
-      producto,
-      cantidad,
-      costo,
-      total,
-      fecha,
-      notas
-    });
-
-    cancelarEdicion();
-  } else {
-    await postGoogle({
-      accion: "agregar",
-      id: Date.now().toString(),
-      proveedor,
-      producto,
-      cantidad,
-      costo,
-      total,
-      fecha,
-      notas
-    });
-
-    limpiarFormulario();
-  }
-
-  cargarDatos();
-}
-
-/* ================= CARGAR EDICION ================= */
-
-function cargarEdicion(id) {
-  const registros = datos.slice(1);
-  const fila = registros.find(f => safeStr(f[0]) === safeStr(id));
-  if (!fila) return;
-
-  document.getElementById("proveedor").value = safeStr(fila[1]);
-  document.getElementById("producto").value = safeStr(fila[2]);
-  document.getElementById("cantidad").value = fila[3] ?? "";
-  document.getElementById("costo").value = fila[4] ?? "";
-  document.getElementById("fecha").value = toDateInputValue(fila[6]);
-  document.getElementById("notas").value = safeStr(fila[7]);
-
-  modoEdicion = true;
-  idEditando = safeStr(id);
-
-  document.getElementById("btnGuardar").innerText = "Actualizar";
-  document.getElementById("btnCancelar").style.display = "inline-block";
-  document.getElementById("tituloFormulario").innerText = "Editar Compra";
-}
-
-/* ================= CANCELAR EDICION ================= */
-
-function cancelarEdicion() {
-  modoEdicion = false;
-  idEditando = null;
-
-  limpiarFormulario();
-
-  document.getElementById("btnGuardar").innerText = "Registrar";
-  document.getElementById("btnCancelar").style.display = "none";
-  document.getElementById("tituloFormulario").innerText = "Registro de Compras";
-}
-
-/* ================= LIMPIAR ================= */
-
-function limpiarFormulario() {
-  document.getElementById("proveedor").value = "";
-  document.getElementById("producto").value = "";
-  document.getElementById("cantidad").value = "";
-  document.getElementById("costo").value = "";
-  document.getElementById("fecha").value = "";
-  document.getElementById("notas").value = "";
-}
-
-/* ================= ELIMINAR (POR ID) ================= */
-
-async function eliminar(id) {
-  if (!confirm("¿Seguro que deseas borrar este registro?")) return;
-
-  await postGoogle({
-    accion: "eliminar",
-    id: safeStr(id)
-  });
-
-  cargarDatos();
-}
-
-/* ================= EXPORTAR ================= */
-
-function exportarExcel() {
-  const exportar = datos.slice(1).map(f => ({
-    ID: f[0],
-    Proveedor: f[1],
-    Producto: f[2],
-    Cantidad: f[3],
-    Costo: f[4],
-    Total: f[5],
-    Fecha: f[6],
-    Notas: f[7]
-  }));
-
-  const hoja = XLSX.utils.json_to_sheet(exportar);
-  const libro = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(libro, hoja, "Compras");
-  XLSX.writeFile(libro, "Compras_LaBonita.xlsx");
-}
-
-/* ================= SELECTORES ANALISIS ================= */
-
-function cargarSelectorProductos() {
-  const selectorProducto = document.getElementById("selectorProducto");
-  if (!selectorProducto) return;
-
-  selectorProducto.innerHTML = "";
-
-  const productos = [...new Set(datos.slice(1).map(f => safeStr(f[2])))]
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
-
-  productos.forEach(p => {
-    selectorProducto.innerHTML += `<option value="${p}">${p}</option>`;
-  });
-}
-
-function actualizarProveedoresDeProducto() {
-  const producto = document.getElementById("selectorProducto").value;
-  const selectorProveedor = document.getElementById("selectorProveedor");
-
-  const proveedores = [...new Set(
-    datos.slice(1)
-      .filter(f => safeStr(f[2]) === safeStr(producto))
-      .map(f => safeStr(f[1]))
-  )].filter(Boolean).sort((a, b) => a.localeCompare(b));
-
-  selectorProveedor.innerHTML = `<option value="__TODOS__">Todos los proveedores</option>`;
-
-  proveedores.forEach(p => {
-    selectorProveedor.innerHTML += `<option value="${p}">${p}</option>`;
-  });
-
-  graficar();
-}
-
-/* ================= GRAFICA + RESUMEN ================= */
-
-function graficar() {
-  const prod = document.getElementById("selectorProducto").value;
-  const prov = document.getElementById("selectorProveedor").value;
-
-  const variacion = document.getElementById("variacion");
-  const mejorProveedor = document.getElementById("mejorProveedor");
-
-  let historial = datos.slice(1).filter(f => safeStr(f[2]) === safeStr(prod));
-
-  if (prov !== "__TODOS__") {
-    historial = historial.filter(f => safeStr(f[1]) === safeStr(prov));
-  }
-
-  historial.sort((a, b) => new Date(a[6]) - new Date(b[6]));
-
-  const labels = historial.map(f => new Date(f[6]).toLocaleDateString());
-  const precios = historial.map(f => Number(f[4]) || 0);
-
-  if (graficaActual) graficaActual.destroy();
-
-  graficaActual = new Chart(document.getElementById("grafica"), {
-    type: "line",
-    data: {
-      labels,
-      datasets: [{
-        label: prov === "__TODOS__" ? `Costo general: ${prod}` : `Costo ${prov}: ${prod}`,
-        data: precios,
-        borderColor: "#C29B40",
-        fill: false
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false
-    }
-  });
-
-  if (precios.length === 0) {
-    variacion.innerText = "Sin datos para este filtro.";
-  } else {
-    const ultimo = precios[precios.length - 1];
-    const promedio = precios.reduce((a, b) => a + b, 0) / precios.length;
-
-    let texto = `📌 Último costo: ${money(ultimo)} • Promedio: ${money(promedio)}`;
-
-    if (precios.length >= 2) {
-      const diff = ultimo - precios[precios.length - 2];
-      texto += diff > 0 ? ` • 🔺 Subió ${money(diff)}`
-        : diff < 0 ? ` • 🔻 Bajó ${money(Math.abs(diff))}`
-        : ` • ➖ Sin cambio`;
-    }
-
-    variacion.innerText = texto;
-  }
-
-  // Mejor proveedor SOLO si está en TODOS
-  if (prov === "__TODOS__") {
-    const porProveedor = {};
-
-    datos.slice(1)
-      .filter(f => safeStr(f[2]) === safeStr(prod))
-      .forEach(f => {
-        const proveedor = safeStr(f[1]);
-        const cantidad = Number(f[3]) || 0;
-        const total = Number(f[5]) || 0;
-
-        if (!porProveedor[proveedor]) {
-          porProveedor[proveedor] = { cantidad: 0, total: 0 };
-        }
-
-        porProveedor[proveedor].cantidad += cantidad;
-        porProveedor[proveedor].total += total;
-      });
-
-    let mejor = null;
-    let mejorProm = Infinity;
-
-    Object.keys(porProveedor).forEach(p => {
-      const cant = porProveedor[p].cantidad;
-      const prom = cant ? porProveedor[p].total / cant : Infinity;
-
-      if (prom < mejorProm) {
-        mejorProm = prom;
-        mejor = p;
-      }
-    });
-
-    if (mejor) {
-      mejorProveedor.innerHTML =
-        `🏆 <b>Mejor proveedor para "${prod}"</b>: ${mejor} (Promedio ponderado: ${money(mejorProm)})`;
-    } else {
-      mejorProveedor.innerHTML = "";
-    }
-  } else {
-    mejorProveedor.innerHTML = "";
+function safeDateDisplay(valor) {
+  if (!valor) return "";
+  try {
+    const d = new Date(valor);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString();
+  } catch {
+    return "";
   }
 }
 
-/* ================= INICIO ================= */
+/* ================= LIMPIAR FILAS ROTAS ================= */
+/*
+  Esperamos siempre 8 columnas:
+  [0] ID
+  [1] PROVEEDOR
+  [2] PRODUCTO
+  [3] CANTIDAD
+  [4] COSTO
+  [5] TOTAL
+  [6] FECHA
+  [7] NOTAS
+*/
+function normalizarFila(fila) {
+  if (!Array.isArray(fila)) return null;
 
-window.onload = () => {
-  cargarDatos();
-};
+  // Rellenar faltantes
+  const f = [...fila];
+  while (f.length < 8) f.push("");
+
+  // Cortar extras
+  if (f.length > 8) f.length = 8;
+
+  // Si no tiene ID, no sirve
+  const id = safeStr(f[0]);
+  if (!id || id.toLowerCase() === "id") return null;
+
+  // Proveedor y producto deben ser texto
+  const proveedor = safeSt
+
+
 
 
 
