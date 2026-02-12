@@ -1,4 +1,4 @@
-const URL_GOOGLE = "https://script.google.com/macros/s/AKfycbyBx_RKlUwL0Vw3_WqsSVLkwoZBVO9x4QWf_NZIaA1HLdrSfT7k3golul6LV44aBw7b5g/exec";
+const URL_GOOGLE = "https://script.google.com/macros/s/AKfycbxVzDzyLA2pb2Zhsti1ttd9SpLt79ldnCdLGjoDxlgKSuDFRTw1ssWdFsY9xnu-5rLAow/exec";
 
 let datos = [];
 let graficaActual = null;
@@ -47,13 +47,10 @@ async function cargarDatos() {
 
   datos = json;
 
-  // Pintar todo
   mostrar();
   actualizarDashboard();
   cargarSelectorProductos();
   actualizarProveedoresDeProducto();
-
-  // Autocompletar
   cargarAutocompletado();
 }
 
@@ -62,6 +59,8 @@ async function cargarDatos() {
 function cargarAutocompletado() {
   const listaProductos = document.getElementById("listaProductos");
   const listaProveedores = document.getElementById("listaProveedores");
+
+  if (!listaProductos || !listaProveedores) return;
 
   listaProductos.innerHTML = "";
   listaProveedores.innerHTML = "";
@@ -93,8 +92,11 @@ function cargarAutocompletado() {
 
 function mostrar() {
   const tabla = document.getElementById("tabla");
-  const filtro = document.getElementById("buscador").value.toLowerCase();
+  const buscador = document.getElementById("buscador");
 
+  if (!tabla || !buscador) return;
+
+  const filtro = buscador.value.toLowerCase();
   tabla.innerHTML = "";
 
   // ORDEN CON ID:
@@ -150,7 +152,6 @@ function actualizarDashboard() {
   let totalInvertido = 0;
   let totalCompras = registros.length;
 
-  // Para producto top
   let resumenCantidad = {};
 
   registros.forEach(fila => {
@@ -317,6 +318,8 @@ function exportarExcel() {
 
 function cargarSelectorProductos() {
   const selectorProducto = document.getElementById("selectorProducto");
+  if (!selectorProducto) return;
+
   selectorProducto.innerHTML = "";
 
   const productos = [...new Set(datos.slice(1).map(f => safeStr(f[2])))]
@@ -437,7 +440,8 @@ function graficar() {
     });
 
     if (mejor) {
-      mejorProveedor.innerHTML = `🏆 <b>Mejor proveedor para "${prod}"</b>: ${mejor} (Promedio ponderado: ${money(mejorProm)})`;
+      mejorProveedor.innerHTML =
+        `🏆 <b>Mejor proveedor para "${prod}"</b>: ${mejor} (Promedio ponderado: ${money(mejorProm)})`;
     } else {
       mejorProveedor.innerHTML = "";
     }
@@ -451,9 +455,6 @@ function graficar() {
 window.onload = () => {
   cargarDatos();
 };
-
-
-
 
 
 
