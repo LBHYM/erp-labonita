@@ -7,6 +7,7 @@
 
   <link rel="stylesheet" href="styles.css" />
 
+  <!-- Librerías -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -24,12 +25,16 @@
         <div class="topbar-sub">La Bonita, Helados y Más…</div>
       </div>
     </div>
+
+    <div class="topbar-right">
+      <span class="pill">Google Sheets</span>
+      <span class="pill pill-ok">En línea</span>
+    </div>
   </header>
 
-  <!-- CONTENIDO -->
   <main class="content">
 
-    <!-- DASHBOARD -->
+    <!-- KPI -->
     <section class="grid-4">
       <div class="kpi">
         <div class="kpi-title">Total invertido</div>
@@ -52,17 +57,19 @@
       </div>
     </section>
 
-    <!-- MODULO COMPRAS -->
+    <!-- PANEL COMPRAS -->
     <section class="panel">
       <div class="panel-header">
         <div>
           <h3 id="tituloFormulario">Registro de Compras</h3>
-          <p>Captura compras de proveedores y consulta historial.</p>
+          <p>Captura compras por proveedor y producto. Edita o borra desde la tabla.</p>
         </div>
         <span class="badge">Compras</span>
       </div>
 
+      <!-- FORM -->
       <div class="form-grid">
+
         <div class="field">
           <label>Proveedor</label>
           <input id="proveedor" list="listaProveedores" placeholder="Ej. COSTCO" />
@@ -71,7 +78,7 @@
 
         <div class="field">
           <label>Producto</label>
-          <input id="producto" list="listaProductos" placeholder="Ej. Fresa caja 10kg" />
+          <input id="producto" list="listaProductos" placeholder="Ej. Pistache 680g" />
           <datalist id="listaProductos"></datalist>
         </div>
 
@@ -97,15 +104,16 @@
       </div>
 
       <div class="form-actions">
-        <button class="btn-primary" id="btnGuardar">Registrar</button>
-        <button class="btn-danger" id="btnCancelar" style="display:none;">Cancelar</button>
+        <button class="btn-primary" id="btnGuardar" onclick="guardarRegistro()">Registrar</button>
+        <button class="btn-danger" id="btnCancelar" onclick="cancelarEdicion()" style="display:none;">Cancelar</button>
       </div>
 
       <div class="toolbar">
-        <input id="buscador" placeholder="Buscar proveedor o producto..." />
-        <button class="btn-secondary" id="btnExportar">Exportar Excel</button>
+        <input id="buscador" placeholder="Buscar proveedor o producto..." onkeyup="mostrar()" />
+        <button class="btn-secondary" onclick="exportarExcel()">Exportar Excel</button>
       </div>
 
+      <!-- TABLA -->
       <div class="table-wrap">
         <table>
           <thead>
@@ -125,24 +133,24 @@
       </div>
     </section>
 
-    <!-- MODULO ANALISIS -->
+    <!-- PANEL ANALISIS -->
     <section class="panel">
       <div class="panel-header">
         <div>
           <h3>Análisis de Costos</h3>
-          <p>Consulta el costo por producto general o por proveedor.</p>
+          <p>Consulta el historial de costo por producto y proveedor.</p>
         </div>
         <span class="badge">Análisis</span>
       </div>
 
       <div class="toolbar">
-        <select id="selectorProducto"></select>
-        <select id="selectorProveedor"></select>
+        <select id="selectorProducto" onchange="actualizarProveedoresDeProducto()"></select>
+        <select id="selectorProveedor" onchange="graficar()"></select>
       </div>
 
       <div class="hint">
-        <b>Modo:</b> “Todos los proveedores” calcula el promedio general del producto.
-        Si eliges un proveedor, verás solo ese proveedor.
+        <b>Cómo funciona:</b> selecciona un producto.  
+        En proveedor puedes elegir “Todos” para ver el promedio general o elegir uno específico.
       </div>
 
       <div class="chart-wrap">
@@ -163,6 +171,8 @@
 <script src="script.js"></script>
 </body>
 </html>
+
+
 
 
 
