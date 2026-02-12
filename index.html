@@ -15,6 +15,7 @@
 
 <div id="sistema" class="app">
 
+  <!-- TOPBAR -->
   <header class="topbar">
     <div class="topbar-left">
       <img src="logo.png" alt="La Bonita" class="topbar-logo" />
@@ -25,8 +26,10 @@
     </div>
   </header>
 
+  <!-- CONTENIDO -->
   <main class="content">
 
+    <!-- DASHBOARD -->
     <section class="grid-4">
       <div class="kpi">
         <div class="kpi-title">Total invertido</div>
@@ -49,6 +52,7 @@
       </div>
     </section>
 
+    <!-- MODULO COMPRAS -->
     <section class="panel">
       <div class="panel-header">
         <div>
@@ -61,12 +65,14 @@
       <div class="form-grid">
         <div class="field">
           <label>Proveedor</label>
-          <input id="proveedor" placeholder="Ej. COSTCO" />
+          <input id="proveedor" placeholder="Ej. SAMS" list="listaProveedores" />
+          <datalist id="listaProveedores"></datalist>
         </div>
 
         <div class="field">
           <label>Producto</label>
-          <input id="producto" placeholder="Ej. Fresa caja 10kg" />
+          <input id="producto" placeholder="Ej. Pistache 680g" list="listaProductos" />
+          <datalist id="listaProductos"></datalist>
         </div>
 
         <div class="field">
@@ -119,11 +125,12 @@
       </div>
     </section>
 
+    <!-- MODULO ANALISIS -->
     <section class="panel">
       <div class="panel-header">
         <div>
           <h3>Análisis de Costos</h3>
-          <p>Consulta el costo por producto general o por proveedor.</p>
+          <p>Selecciona un producto y compara proveedores.</p>
         </div>
         <span class="badge">Análisis</span>
       </div>
@@ -134,8 +141,29 @@
       </div>
 
       <div class="hint">
-        <b>Modo:</b> “Todos los proveedores” mezcla el producto (visión general).  
-        Si eliges un
+        <b>Modo:</b> “Todos los proveedores” mezcla el producto (visión general).
+        Si eliges un proveedor, verás solo ese proveedor.
+      </div>
+
+      <div class="chart-wrap">
+        <canvas id="grafica"></canvas>
+      </div>
+
+      <div id="variacion" class="variation"></div>
+      <div id="mejorProveedor" class="best"></div>
+    </section>
+
+    <footer class="footer">
+      Sistema interno • La Bonita, Helados y Más…
+    </footer>
+
+  </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
+
 
 
 
