@@ -1,5 +1,5 @@
 const URL_GOOGLE =
-  "https://script.google.com/macros/s/AKfycbxVzDzyLA2pb2Zhsti1ttd9SpLt79ldnCdLGjoDxlgKSuDFRTw1ssWdFsY9xnu-5rLAow/exec";
+  "https://script.google.com/macros/s/AKfycbyuh0KIo6GUa8i7qbSoCgyAlAlnRQoUC_qJ8ys-BjDc4K5daaxbXhmwQO18KtLqckOwxQ/exec";
 
 let datos = [];
 let graficaActual = null;
@@ -553,6 +553,7 @@ window.onload = async () => {
   conectarEventos();
   await cargarDatos();
 };
+
 
 
 
