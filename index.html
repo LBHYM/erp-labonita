@@ -65,13 +65,13 @@
       <div class="form-grid">
         <div class="field">
           <label>Proveedor</label>
-          <input id="proveedor" placeholder="Ej. SAMS" list="listaProveedores" />
+          <input id="proveedor" list="listaProveedores" placeholder="Ej. COSTCO" />
           <datalist id="listaProveedores"></datalist>
         </div>
 
         <div class="field">
           <label>Producto</label>
-          <input id="producto" placeholder="Ej. Pistache 680g" list="listaProductos" />
+          <input id="producto" list="listaProductos" placeholder="Ej. Fresa caja 10kg" />
           <datalist id="listaProductos"></datalist>
         </div>
 
@@ -97,13 +97,13 @@
       </div>
 
       <div class="form-actions">
-        <button class="btn-primary" id="btnGuardar" onclick="guardarRegistro()">Registrar</button>
-        <button class="btn-danger" id="btnCancelar" onclick="cancelarEdicion()" style="display:none;">Cancelar</button>
+        <button class="btn-primary" id="btnGuardar">Registrar</button>
+        <button class="btn-danger" id="btnCancelar" style="display:none;">Cancelar</button>
       </div>
 
       <div class="toolbar">
-        <input id="buscador" placeholder="Buscar proveedor o producto..." onkeyup="mostrar()" />
-        <button class="btn-secondary" onclick="exportarExcel()">Exportar Excel</button>
+        <input id="buscador" placeholder="Buscar proveedor o producto..." />
+        <button class="btn-secondary" id="btnExportar">Exportar Excel</button>
       </div>
 
       <div class="table-wrap">
@@ -130,18 +130,18 @@
       <div class="panel-header">
         <div>
           <h3>Análisis de Costos</h3>
-          <p>Selecciona un producto y compara proveedores.</p>
+          <p>Consulta el costo por producto general o por proveedor.</p>
         </div>
         <span class="badge">Análisis</span>
       </div>
 
       <div class="toolbar">
-        <select id="selectorProducto" onchange="actualizarProveedoresDeProducto()"></select>
-        <select id="selectorProveedor" onchange="graficar()"></select>
+        <select id="selectorProducto"></select>
+        <select id="selectorProveedor"></select>
       </div>
 
       <div class="hint">
-        <b>Modo:</b> “Todos los proveedores” mezcla el producto (visión general).
+        <b>Modo:</b> “Todos los proveedores” calcula el promedio general del producto.
         Si eliges un proveedor, verás solo ese proveedor.
       </div>
 
@@ -163,13 +163,6 @@
 <script src="script.js"></script>
 </body>
 </html>
-
-
-
-
-
-
-
 
 
 
