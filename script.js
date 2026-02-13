@@ -452,12 +452,3 @@ window.addEventListener("load", async () => {
   conectarEventos();
   await cargarDatos();
 });
-
-
-
-
-
-
-
-
-
