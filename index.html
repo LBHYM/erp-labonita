@@ -1,23 +1,22 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>La Bonita | ERP Compras</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>La Bonita | ERP Compras</title>
 
-<link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css" />
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 
 <body>
-
-  <div class="app">
+  <div id="sistema" class="app">
 
     <header class="topbar">
       <div class="topbar-left">
-        <img src="logo.png" class="topbar-logo" alt="La Bonita" />
+        <img src="logo.png" alt="La Bonita" class="topbar-logo">
         <div>
           <div class="topbar-title">ERP Compras</div>
           <div class="topbar-sub">La Bonita, Helados y Más…</div>
@@ -27,6 +26,7 @@
 
     <main class="content">
 
+      <!-- DASHBOARD -->
       <section class="grid-4">
         <div class="kpi">
           <div class="kpi-title">Total invertido</div>
@@ -49,22 +49,56 @@
         </div>
       </section>
 
+      <!-- MODULO COMPRAS -->
       <section class="panel">
         <div class="panel-header">
           <div>
-            <h3>Acciones</h3>
-            <p>Accede rápido para agregar o modificar registros.</p>
+            <h3 id="tituloFormulario">Registro de Compras</h3>
+            <p>Captura compras de proveedores y consulta historial.</p>
+          </div>
+          <span class="badge">Compras</span>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label>Proveedor</label>
+            <input id="proveedor" placeholder="Ej. COSTCO">
+          </div>
+
+          <div class="field">
+            <label>Producto</label>
+            <input id="producto" placeholder="Ej. Fresa caja 10kg">
+          </div>
+
+          <div class="field">
+            <label>Cantidad</label>
+            <input id="cantidad" type="number" placeholder="Ej. 40">
+          </div>
+
+          <div class="field">
+            <label>Costo unitario</label>
+            <input id="costo" type="number" step="0.01" placeholder="Ej. 23.00">
+          </div>
+
+          <div class="field">
+            <label>Fecha</label>
+            <input id="fecha" type="date">
+          </div>
+
+          <div class="field">
+            <label>Notas</label>
+            <input id="notas" placeholder="Ej. Compra semanal">
           </div>
         </div>
 
-        <div class="toolbar">
-          <button class="btn-primary" onclick="abrirForm()">Registrar compra</button>
-          <button class="btn-secondary" onclick="abrirSheet()">Abrir Sheet</button>
+        <div class="form-actions">
+          <button class="btn-primary" id="btnGuardar">Registrar</button>
+          <button class="btn-danger" id="btnCancelar" style="display:none;">Cancelar</button>
         </div>
 
         <div class="toolbar">
-          <input id="buscador" placeholder="Buscar proveedor o producto..." onkeyup="mostrar()" />
-          <button class="btn-secondary" onclick="exportarExcel()">Exportar Excel</button>
+          <input id="buscador" placeholder="Buscar proveedor o producto...">
+          <button class="btn-secondary" id="btnExportar">Exportar Excel</button>
         </div>
 
         <div class="table-wrap">
@@ -78,6 +112,7 @@
                 <th>Total</th>
                 <th>Fecha</th>
                 <th>Notas</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody id="tabla"></tbody>
@@ -85,15 +120,25 @@
         </div>
       </section>
 
+      <!-- MODULO ANALISIS -->
       <section class="panel">
         <div class="panel-header">
           <div>
             <h3>Análisis de Costos</h3>
+            <p>Consulta el costo por producto general o por proveedor.</p>
           </div>
+          <span class="badge">Análisis</span>
         </div>
 
         <div class="toolbar">
-          <select id="selectorProducto" onchange="graficar()"></select>
+          <select id="selectorProducto"></select>
+          <select id="selectorProveedor"></select>
+          <button class="btn-secondary" id="btnGraficar">Actualizar</button>
+        </div>
+
+        <div class="hint">
+          <b>Modo:</b> Si eliges “Todos los proveedores”, verás el promedio general del producto.
+          Si eliges un proveedor, verás solo ese proveedor.
         </div>
 
         <div class="chart-wrap">
@@ -103,6 +148,10 @@
         <div id="variacion" class="variation"></div>
         <div id="mejorProveedor" class="best"></div>
       </section>
+
+      <footer class="footer">
+        Sistema interno • La Bonita, Helados y Más…
+      </footer>
 
     </main>
   </div>
