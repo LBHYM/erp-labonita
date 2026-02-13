@@ -7,10 +7,7 @@
 
   <link rel="stylesheet" href="styles.css" />
 
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- XLSX -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 
@@ -33,7 +30,6 @@
       </a>
     </header>
 
-    <!-- CONTENIDO -->
     <main class="content">
 
       <!-- DASHBOARD -->
@@ -59,12 +55,12 @@
         </div>
       </section>
 
-      <!-- PANEL REGISTROS -->
+      <!-- PANEL COMPRAS -->
       <section class="panel">
         <div class="panel-header">
           <div>
             <h3>Compras registradas</h3>
-            <p>Consulta tu historial. Para registrar una compra se usa el Form.</p>
+            <p>Se registran con el Form. Editar/Borrar se hace en Sheets.</p>
           </div>
           <span class="badge">Compras</span>
         </div>
@@ -75,16 +71,8 @@
           <div class="toolbar-right">
             <input id="fechaInicio" type="date" />
             <input id="fechaFin" type="date" />
-
-            <button class="btn-secondary" onclick="exportarExcel()">
-              Exportar Excel
-            </button>
+            <button class="btn-secondary" id="btnExportar">Exportar Excel</button>
           </div>
-        </div>
-
-        <div class="hint">
-          <b>Nota:</b> Para borrar o editar, lo haces directo en Google Sheets.
-          (Así evitamos errores y bloqueos de Google).
         </div>
 
         <div class="table-wrap">
@@ -111,8 +99,8 @@
       <section class="panel">
         <div class="panel-header">
           <div>
-            <h3>Análisis de Costos</h3>
-            <p>Consulta el costo de un producto por proveedor o general.</p>
+            <h3>Análisis de costos</h3>
+            <p>Historial de costo por producto, por proveedor o general.</p>
           </div>
           <span class="badge">Análisis</span>
         </div>
@@ -120,12 +108,6 @@
         <div class="toolbar">
           <select id="selectorProducto"></select>
           <select id="selectorProveedor"></select>
-        </div>
-
-        <div class="hint">
-          <b>Cómo leer la gráfica:</b><br />
-          - Si eliges <b>Todos los proveedores</b>, verás el precio promedio general del producto.<br />
-          - Si eliges un proveedor, verás el historial de precio de ese proveedor.
         </div>
 
         <div class="chart-wrap">
@@ -146,3 +128,5 @@
   <script src="script.js"></script>
 </body>
 </html>
+
+
