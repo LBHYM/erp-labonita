@@ -14,6 +14,19 @@ function safeStr(x) {
   return (x ?? "").toString().trim();
 }
 
+function toISODateOnly(valor) {
+  if (!valor) return "";
+  try {
+    // Si ya viene como "2026-02-04" lo deja igual
+    if (typeof valor === "string" && valor.includes("-") && valor.length >= 10) {
+      return valor.substring(0, 10);
+    }
+    return new Date(valor).toISOString().split("T")[0];
+  } catch {
+    return "";
+  }
+}
+
 /* ================= CARGAR DATOS ================= */
 
 async function cargarDatos() {
@@ -121,23 +134,121 @@ function actualizarDashboard() {
   document.getElementById("promedioGeneral").innerText = money(promedioGeneral);
 }
 
-/* ================= EXPORTAR ================= */
+/* ================= EXPORTAR EXCEL (3 HOJAS) ================= */
 
 function exportarExcel() {
-  const exportar = datos.slice(1).map(f => ({
+  if (!datos || datos.length <= 1) {
+    alert("No hay datos para exportar.");
+    return;
+  }
+
+  const registros = datos.slice(1);
+
+  /* -------------------------------
+     HOJA 1: COMPRAS (HISTORIAL)
+  -------------------------------- */
+  const hojaCompras = registros.map(f => ({
     ID: f[0],
     Proveedor: f[1],
     Producto: f[2],
     Cantidad: f[3],
     Costo: f[4],
     Total: f[5],
-    Fecha: f[6],
+    Fecha: toISODateOnly(f[6]),
     Notas: f[7]
   }));
 
-  const hoja = XLSX.utils.json_to_sheet(exportar);
+  /* -------------------------------
+     HOJA 2: TOTALES POR FECHA + PRODUCTO
+  -------------------------------- */
+  const resumenFechaProducto = {};
+  registros.forEach(f => {
+    const fecha = toISODateOnly(f[6]);
+    const producto = safeStr(f[2]);
+    const cantidad = Number(f[3]) || 0;
+    const total = Number(f[5]) || 0;
+
+    const key = `${fecha}||${producto}`;
+
+    if (!resumenFechaProducto[key]) {
+      resumenFechaProducto[key] = {
+        Fecha: fecha,
+        Producto: producto,
+        Cantidad_Total: 0,
+        Total_Gastado: 0
+      };
+    }
+
+    resumenFechaProducto[key].Cantidad_Total += cantidad;
+    resumenFechaProducto[key].Total_Gastado += total;
+  });
+
+  const hojaTotalesFechaProducto = Object.values(resumenFechaProducto)
+    .sort((a, b) => {
+      if (a.Fecha === b.Fecha) return a.Producto.localeCompare(b.Producto);
+      return a.Fecha.localeCompare(b.Fecha);
+    })
+    .map(x => ({
+      Fecha: x.Fecha,
+      Producto: x.Producto,
+      Cantidad_Total: x.Cantidad_Total,
+      Total_Gastado: Number(x.Total_Gastado.toFixed(2))
+    }));
+
+  /* -------------------------------
+     HOJA 3: TOTALES POR FECHA + PRODUCTO + PROVEEDOR
+  -------------------------------- */
+  const resumenFechaProductoProveedor = {};
+  registros.forEach(f => {
+    const fecha = toISODateOnly(f[6]);
+    const producto = safeStr(f[2]);
+    const proveedor = safeStr(f[1]);
+    const cantidad = Number(f[3]) || 0;
+    const total = Number(f[5]) || 0;
+
+    const key = `${fecha}||${producto}||${proveedor}`;
+
+    if (!resumenFechaProductoProveedor[key]) {
+      resumenFechaProductoProveedor[key] = {
+        Fecha: fecha,
+        Producto: producto,
+        Proveedor: proveedor,
+        Cantidad_Total: 0,
+        Total_Gastado: 0
+      };
+    }
+
+    resumenFechaProductoProveedor[key].Cantidad_Total += cantidad;
+    resumenFechaProductoProveedor[key].Total_Gastado += total;
+  });
+
+  const hojaTotalesFechaProductoProveedor = Object.values(resumenFechaProductoProveedor)
+    .sort((a, b) => {
+      if (a.Fecha !== b.Fecha) return a.Fecha.localeCompare(b.Fecha);
+      if (a.Producto !== b.Producto) return a.Producto.localeCompare(b.Producto);
+      return a.Proveedor.localeCompare(b.Proveedor);
+    })
+    .map(x => ({
+      Fecha: x.Fecha,
+      Producto: x.Producto,
+      Proveedor: x.Proveedor,
+      Cantidad_Total: x.Cantidad_Total,
+      Total_Gastado: Number(x.Total_Gastado.toFixed(2))
+    }));
+
+  /* -------------------------------
+     CREAR EXCEL CON 3 HOJAS
+  -------------------------------- */
   const libro = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(libro, hoja, "Compras");
+
+  const ws1 = XLSX.utils.json_to_sheet(hojaCompras);
+  const ws2 = XLSX.utils.json_to_sheet(hojaTotalesFechaProducto);
+  const ws3 = XLSX.utils.json_to_sheet(hojaTotalesFechaProductoProveedor);
+
+  XLSX.utils.book_append_sheet(libro, ws1, "Compras");
+  XLSX.utils.book_append_sheet(libro, ws2, "Totales_Fech_Prod");
+  XLSX.utils.book_append_sheet(libro, ws3, "Totales_Fech_Prod_Prov");
+
   XLSX.writeFile(libro, "Compras_LaBonita.xlsx");
 }
 
@@ -205,7 +316,8 @@ function graficar() {
         label: prov === "__TODOS__" ? `Costo general: ${prod}` : `Costo ${prov}: ${prod}`,
         data: precios,
         borderColor: "#C29B40",
-        fill: false
+        fill: false,
+        tension: 0.25
       }]
     },
     options: {
