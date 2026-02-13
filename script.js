@@ -3,7 +3,8 @@
  * Lee/Escribe en Google Sheets vía Apps Script
  ********************************************************/
 
-const URL_GOOGLE = "https://script.google.com/macros/s/AKfycbxVzDzyLA2pb2Zhsti1ttd9SpLt79ldnCdLGjoDxlgKSuDFRTw1ssWdFsY9xnu-5rLAow/exec";
+const URL_GOOGLE = "https://script.google.com/macros/s/AKfycbzoBfDo7oOnX28IVm0T29VFieT6T2wnMfj35rc1WtiwU514iU1vuIv8un-AT92JSofMyw/exec
+";
 
 let datos = [];
 let graficaActual = null;
@@ -452,3 +453,4 @@ window.addEventListener("load", async () => {
   conectarEventos();
   await cargarDatos();
 });
+
