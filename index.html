@@ -7,219 +7,141 @@
 
   <link rel="stylesheet" href="styles.css" />
 
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- XLSX -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 
 <body>
 
-  <!-- TOPBAR -->
-  <header class="topbar">
-    <div class="topbar-left">
-      <img src="logo.png" alt="La Bonita" class="topbar-logo">
-      <div>
-        <div class="topbar-title">ERP Compras</div>
-        <div class="topbar-sub">La Bonita, Helados y Más…</div>
-      </div>
-    </div>
+  <div class="app">
 
-    <div class="topbar-right">
-      <span class="pill">Google Sheets</span>
-    </div>
-  </header>
-
-  <!-- CONTENIDO -->
-  <main class="content">
-
-    <!-- DASHBOARD -->
-    <section class="grid-4">
-      <div class="kpi">
-        <div class="kpi-title">Total invertido</div>
-        <div class="kpi-value" id="totalInvertido">$0</div>
-      </div>
-
-      <div class="kpi">
-        <div class="kpi-title">Total compras</div>
-        <div class="kpi-value" id="totalCompras">0</div>
-      </div>
-
-      <div class="kpi">
-        <div class="kpi-title">Producto más comprado</div>
-        <div class="kpi-value" id="productoTop">-</div>
-      </div>
-
-      <div class="kpi">
-        <div class="kpi-title">Pendiente de pago</div>
-        <div class="kpi-value" id="totalPendiente">$0</div>
-      </div>
-    </section>
-
-    <!-- MODULO COMPRAS -->
-    <section class="panel">
-      <div class="panel-header">
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <img src="logo.png" alt="La Bonita" class="topbar-logo" />
         <div>
-          <h3 id="tituloFormulario">Registro de Compras</h3>
-          <p>Captura compras de proveedores y consulta historial.</p>
-        </div>
-        <span class="badge">Compras</span>
-      </div>
-
-      <div class="form-grid">
-        <div class="field">
-          <label>Proveedor</label>
-          <input id="proveedor" placeholder="Ej. COSTCO" list="listaProveedores">
-          <datalist id="listaProveedores"></datalist>
-        </div>
-
-        <div class="field">
-          <label>Producto</label>
-          <input id="producto" placeholder="Ej. Fresa caja 10kg" list="listaProductos">
-          <datalist id="listaProductos"></datalist>
-        </div>
-
-        <div class="field">
-          <label>Cantidad</label>
-          <input id="cantidad" type="number" placeholder="Ej. 40">
-        </div>
-
-        <div class="field">
-          <label>Costo unitario</label>
-          <input id="costo" type="number" step="0.01" placeholder="Ej. 23.00">
-        </div>
-
-        <div class="field">
-          <label>Fecha</label>
-          <input id="fecha" type="date">
-        </div>
-
-        <div class="field">
-          <label>Notas</label>
-          <input id="notas" placeholder="Ej. Compra semanal">
-        </div>
-
-        <div class="field">
-          <label>Estatus</label>
-          <select id="estatus">
-            <option value="ACTIVO">ACTIVO</option>
-            <option value="CANCELADO">CANCELADO</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label>Pago</label>
-          <select id="pago">
-            <option value="PENDIENTE">PENDIENTE</option>
-            <option value="PAGADO">PAGADO</option>
-          </select>
+          <div class="topbar-title">ERP Compras</div>
+          <div class="topbar-sub">La Bonita, Helados y Más…</div>
         </div>
       </div>
 
-      <div class="form-actions">
-        <button class="btn-primary" id="btnGuardar" onclick="guardarRegistro()">Registrar</button>
-        <button class="btn-danger" id="btnCancelar" onclick="cancelarEdicion()" style="display:none;">Cancelar</button>
-      </div>
+      <a class="btn-ghost" id="btnAbrirForm" target="_blank" rel="noopener">
+        + Registrar compra
+      </a>
+    </header>
 
-      <div class="toolbar">
-        <input id="buscador" placeholder="Buscar proveedor o producto..." onkeyup="mostrar()">
+    <!-- CONTENIDO -->
+    <main class="content">
 
-        <div class="date-filters">
-          <div class="mini-field">
-            <label>Desde</label>
-            <input type="date" id="filtroDesde" onchange="mostrar();actualizarDashboard();actualizarResumenProveedor();">
+      <!-- DASHBOARD -->
+      <section class="grid-4">
+        <div class="kpi">
+          <div class="kpi-title">Total invertido</div>
+          <div class="kpi-value" id="totalInvertido">$0</div>
+        </div>
+
+        <div class="kpi">
+          <div class="kpi-title">Total compras</div>
+          <div class="kpi-value" id="totalCompras">0</div>
+        </div>
+
+        <div class="kpi">
+          <div class="kpi-title">Producto más comprado</div>
+          <div class="kpi-value" id="productoTop">-</div>
+        </div>
+
+        <div class="kpi">
+          <div class="kpi-title">Promedio por compra</div>
+          <div class="kpi-value" id="promedioGeneral">$0</div>
+        </div>
+      </section>
+
+      <!-- PANEL REGISTROS -->
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>Compras registradas</h3>
+            <p>Consulta tu historial. Para registrar una compra se usa el Form.</p>
           </div>
+          <span class="badge">Compras</span>
+        </div>
 
-          <div class="mini-field">
-            <label>Hasta</label>
-            <input type="date" id="filtroHasta" onchange="mostrar();actualizarDashboard();actualizarResumenProveedor();">
+        <div class="toolbar">
+          <input id="buscador" placeholder="Buscar proveedor o producto..." />
+
+          <div class="toolbar-right">
+            <input id="fechaInicio" type="date" />
+            <input id="fechaFin" type="date" />
+
+            <button class="btn-secondary" onclick="exportarExcel()">
+              Exportar Excel
+            </button>
           </div>
         </div>
 
-        <button class="btn-secondary" onclick="exportarExcel()">Exportar Excel</button>
-      </div>
-
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Proveedor</th>
-              <th>Producto</th>
-              <th>Cantidad</th>
-              <th>Costo</th>
-              <th>Total</th>
-              <th>Fecha</th>
-              <th>Estatus</th>
-              <th>Pago</th>
-              <th>Notas</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="tabla"></tbody>
-        </table>
-      </div>
-
-      <div class="note">
-        📌 Para eliminar un registro, márcalo como <b>CANCELADO</b> (no se recomienda borrar filas en Sheets).
-      </div>
-    </section>
-
-    <!-- MODULO RESUMEN POR PROVEEDOR -->
-    <section class="panel">
-      <div class="panel-header">
-        <div>
-          <h3>Resumen por Proveedor</h3>
-          <p>Te muestra cuánto has comprado por proveedor (según filtro de fechas).</p>
+        <div class="hint">
+          <b>Nota:</b> Para borrar o editar, lo haces directo en Google Sheets.
+          (Así evitamos errores y bloqueos de Google).
         </div>
-        <span class="badge">Proveedores</span>
-      </div>
 
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Proveedor</th>
-              <th>Compras</th>
-              <th>Total gastado</th>
-              <th>Pendiente</th>
-            </tr>
-          </thead>
-          <tbody id="tablaProveedores"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- MODULO ANALISIS -->
-    <section class="panel">
-      <div class="panel-header">
-        <div>
-          <h3>Análisis de Costos</h3>
-          <p>Consulta el costo por producto general o por proveedor.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Proveedor</th>
+                <th>Producto</th>
+                <th>Cantidad</th>
+                <th>Costo unitario</th>
+                <th>Total</th>
+                <th>Fecha</th>
+                <th>Estatus</th>
+                <th>Pago</th>
+                <th>Nota</th>
+              </tr>
+            </thead>
+            <tbody id="tabla"></tbody>
+          </table>
         </div>
-        <span class="badge">Análisis</span>
-      </div>
+      </section>
 
-      <div class="toolbar">
-        <select id="selectorProducto" onchange="actualizarProveedoresDeProducto()"></select>
-        <select id="selectorProveedor" onchange="graficar()"></select>
-      </div>
+      <!-- PANEL ANALISIS -->
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>Análisis de Costos</h3>
+            <p>Consulta el costo de un producto por proveedor o general.</p>
+          </div>
+          <span class="badge">Análisis</span>
+        </div>
 
-      <div class="hint">
-        <b>Modo:</b> Si eliges “Todos los proveedores”, verás el promedio general del producto.
-        Si eliges un proveedor, verás solo ese proveedor.
-      </div>
+        <div class="toolbar">
+          <select id="selectorProducto"></select>
+          <select id="selectorProveedor"></select>
+        </div>
 
-      <div class="chart-wrap">
-        <canvas id="grafica"></canvas>
-      </div>
+        <div class="hint">
+          <b>Cómo leer la gráfica:</b><br />
+          - Si eliges <b>Todos los proveedores</b>, verás el precio promedio general del producto.<br />
+          - Si eliges un proveedor, verás el historial de precio de ese proveedor.
+        </div>
 
-      <div id="variacion" class="variation"></div>
-      <div id="mejorProveedor" class="best"></div>
-    </section>
+        <div class="chart-wrap">
+          <canvas id="grafica"></canvas>
+        </div>
 
-    <footer class="footer">
-      Sistema interno • La Bonita, Helados y Más…
-    </footer>
+        <div id="variacion" class="variation"></div>
+        <div id="mejorProveedor" class="best"></div>
+      </section>
 
-  </main>
+      <footer class="footer">
+        Sistema interno • La Bonita, Helados y Más…
+      </footer>
+
+    </main>
+  </div>
 
   <script src="script.js"></script>
 </body>
