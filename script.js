@@ -1,11 +1,8 @@
 /* =========================================================
    LA BONITA - ERP COMPRAS (MODO GRATIS SIN APPS SCRIPT)
-   - Lee datos desde Google Sheets como CSV (sin CORS)
-   - Registra compras desde Google Form (link)
-   - Borrar/Editar: se hace manual en Sheets (evita bloqueos)
+   - Lee datos desde Google Sheets como CSV
+   - Registra compras desde Google Form
    ========================================================= */
-
-/* =================== CONFIG =================== */
 
 const SHEET_ID = "1TyDxOtgkaxqhPCPTCSkpCkE7aCkZTNiC1XvS1AmiNnw";
 const GID_RESPUESTAS = "1801367087";
@@ -14,9 +11,7 @@ const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScU3WYqUEGqQmgcWajim9
 
 const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID_RESPUESTAS}`;
 
-/* =================== ESTADO =================== */
-
-let registros = []; // array de objetos
+let registros = [];
 let graficaActual = null;
 
 /* =================== HELPERS =================== */
@@ -31,13 +26,7 @@ function safeStr(x) {
 }
 
 function normalizarFecha(valor) {
-  // Form puede traer dd/mm/yyyy o yyyy-mm-dd
-  // Convertimos a Date confiable
   if (!valor) return null;
-
-  // Si ya es tipo Date (por si acaso)
-  if (valor instanceof Date) return valor;
-
   const s = safeStr(valor);
 
   // yyyy-mm-dd
@@ -53,22 +42,18 @@ function normalizarFecha(valor) {
     return isNaN(d) ? null : d;
   }
 
-  // timestamp
   const d = new Date(s);
   return isNaN(d) ? null : d;
 }
 
 function fechaToISO(d) {
   if (!d) return "";
-  try {
-    return new Date(d).toISOString().split("T")[0];
-  } catch {
-    return "";
-  }
+  return new Date(d).toISOString().split("T")[0];
 }
 
+/* =================== CSV PARSER =================== */
+
 function parseCSVLine(line) {
-  // Parser CSV simple con comillas
   const result = [];
   let current = "";
   let inQuotes = false;
@@ -110,8 +95,6 @@ function parseCSV(text) {
 
   const rows = lines.map(parseCSVLine);
 
-  // Encabezados (Google Forms)
-  // Marca temporal, Proveedor, Producto, Cantidad, Costo unitario, Fecha, Nota, Estatus, Pago
   const header = rows[0].map(h => safeStr(h).toLowerCase());
 
   const idx = {
@@ -120,7 +103,7 @@ function parseCSV(text) {
     producto: header.findIndex(h => h.includes("producto")),
     cantidad: header.findIndex(h => h.includes("cantidad")),
     costo: header.findIndex(h => h.includes("costo")),
-    fecha: header.findIndex(h => h === "fecha" || h.includes("fecha")),
+    fecha: header.findIndex(h => h.includes("fecha")),
     nota: header.findIndex(h => h.includes("nota")),
     estatus: header.findIndex(h => h.includes("estatus")),
     pago: header.findIndex(h => h.includes("pago"))
@@ -138,13 +121,10 @@ function parseCSV(text) {
     const total = cantidad * costo;
 
     const fechaCompra = normalizarFecha(r[idx.fecha]);
-    const fechaRegistro = normalizarFecha(r[idx.timestamp]);
-
     const nota = safeStr(r[idx.nota]);
     const estatus = safeStr(r[idx.estatus]);
     const pago = safeStr(r[idx.pago]);
 
-    // ID estable: timestamp + proveedor + producto + index
     const id = `${safeStr(r[idx.timestamp])}-${proveedor}-${producto}-${i}`;
 
     return {
@@ -155,49 +135,28 @@ function parseCSV(text) {
       costo,
       total,
       fechaCompra,
-      fechaRegistro,
       nota,
       estatus,
       pago
     };
   });
 
-  // Quitamos filas vacías
   return objs.filter(o => o.proveedor || o.producto);
-}
-
-/* =================== CARGA DATOS =================== */
-
-async function cargarDatos() {
-  try {
-    const res = await fetch(CSV_URL, { cache: "no-store" });
-    const csv = await res.text();
-
-    registros = parseCSV(csv);
-
-    // Orden por fecha de compra (más reciente arriba)
-    registros.sort((a, b) => {
-      const da = a.fechaCompra ? a.fechaCompra.getTime() : 0;
-      const db = b.fechaCompra ? b.fechaCompra.getTime() : 0;
-      return db - da;
-    });
-
-    pintarTodo();
-  } catch (err) {
-    console.error(err);
-    alert("No se pudieron cargar los datos. Revisa que el Sheet sea público o compartido correctamente.");
-  }
 }
 
 /* =================== FILTROS =================== */
 
 function getFiltros() {
-  const q = safeStr(document.getElementById("buscador").value).toLowerCase();
+  const buscador = document.getElementById("buscador");
+  const fechaInicio = document.getElementById("fechaInicio");
+  const fechaFin = document.getElementById("fechaFin");
 
-  const inicio = document.getElementById("fechaInicio").value;
-  const fin = document.getElementById("fechaFin").value;
+  const q = buscador ? safeStr(buscador.value).toLowerCase() : "";
 
-  const dIni = inicio ? new Date(inicio + "T00:00:00") : null;
+  const ini = fechaInicio ? fechaInicio.value : "";
+  const fin = fechaFin ? fechaFin.value : "";
+
+  const dIni = ini ? new Date(ini + "T00:00:00") : null;
   const dFin = fin ? new Date(fin + "T23:59:59") : null;
 
   return { q, dIni, dFin };
@@ -207,7 +166,6 @@ function filtrarRegistros(lista) {
   const { q, dIni, dFin } = getFiltros();
 
   return lista.filter(r => {
-    // Buscar
     if (q) {
       const ok =
         r.proveedor.toLowerCase().includes(q) ||
@@ -215,18 +173,16 @@ function filtrarRegistros(lista) {
       if (!ok) return false;
     }
 
-    // Fecha compra
-    if (dIni && r.fechaCompra && r.fechaCompra < dIni) return false;
-    if (dFin && r.fechaCompra && r.fechaCompra > dFin) return false;
-
-    // Si no tiene fechaCompra, lo dejamos pasar solo si no hay filtros de fecha
     if ((dIni || dFin) && !r.fechaCompra) return false;
+
+    if (dIni && r.fechaCompra < dIni) return false;
+    if (dFin && r.fechaCompra > dFin) return false;
 
     return true;
   });
 }
 
-/* =================== TABLA =================== */
+/* =================== UI =================== */
 
 function tagHTML(texto, tipo) {
   const t = safeStr(texto);
@@ -287,13 +243,11 @@ function mostrarTabla() {
   });
 }
 
-/* =================== DASHBOARD =================== */
-
 function actualizarDashboard() {
   const lista = filtrarRegistros(registros);
 
   let totalInvertido = 0;
-  let resumenCantidad = {}; // producto -> cantidad
+  let resumenCantidad = {};
 
   lista.forEach(r => {
     totalInvertido += r.total || 0;
@@ -321,7 +275,7 @@ function actualizarDashboard() {
   document.getElementById("promedioGeneral").innerText = money(promedio);
 }
 
-/* =================== SELECTORES ANALISIS =================== */
+/* =================== ANALISIS =================== */
 
 function cargarSelectorProductos() {
   const sel = document.getElementById("selectorProducto");
@@ -345,12 +299,8 @@ function actualizarProveedoresDeProducto() {
   const sel = document.getElementById("selectorProveedor");
 
   const proveedores = [...new Set(
-    registros
-      .filter(r => r.producto === prod)
-      .map(r => r.proveedor)
-  )]
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
+    registros.filter(r => r.producto === prod).map(r => r.proveedor)
+  )].filter(Boolean).sort((a, b) => a.localeCompare(b));
 
   sel.innerHTML = `<option value="__TODOS__">Todos los proveedores</option>`;
   proveedores.forEach(p => {
@@ -359,8 +309,6 @@ function actualizarProveedoresDeProducto() {
 
   graficar();
 }
-
-/* =================== GRAFICA =================== */
 
 function graficar() {
   const prod = document.getElementById("selectorProducto").value;
@@ -377,7 +325,6 @@ function graficar() {
     historial = historial.filter(r => r.proveedor === prov);
   }
 
-  // Orden por fecha compra ascendente
   historial.sort((a, b) => {
     const da = a.fechaCompra ? a.fechaCompra.getTime() : 0;
     const db = b.fechaCompra ? b.fechaCompra.getTime() : 0;
@@ -413,34 +360,18 @@ function graficar() {
   } else {
     const ultimo = precios[precios.length - 1];
     const promedio = precios.reduce((a, b) => a + b, 0) / precios.length;
-
-    let texto = `📌 Último costo: ${money(ultimo)} • Promedio: ${money(promedio)}`;
-
-    if (precios.length >= 2) {
-      const diff = ultimo - precios[precios.length - 2];
-      texto += diff > 0
-        ? ` • 🔺 Subió ${money(diff)}`
-        : diff < 0
-          ? ` • 🔻 Bajó ${money(Math.abs(diff))}`
-          : ` • ➖ Sin cambio`;
-    }
-
-    variacion.innerText = texto;
+    variacion.innerText = `📌 Último costo: ${money(ultimo)} • Promedio: ${money(promedio)}`;
   }
 
-  // Mejor proveedor (solo en TODOS)
   if (prov === "__TODOS__") {
     const porProveedor = {};
 
-    registros
-      .filter(r => r.producto === prod)
-      .forEach(r => {
-        const proveedor = r.proveedor;
-        if (!porProveedor[proveedor]) porProveedor[proveedor] = { cantidad: 0, total: 0 };
-
-        porProveedor[proveedor].cantidad += r.cantidad || 0;
-        porProveedor[proveedor].total += r.total || 0;
-      });
+    registros.filter(r => r.producto === prod).forEach(r => {
+      const p = r.proveedor;
+      if (!porProveedor[p]) porProveedor[p] = { cantidad: 0, total: 0 };
+      porProveedor[p].cantidad += r.cantidad || 0;
+      porProveedor[p].total += r.total || 0;
+    });
 
     let mejor = null;
     let mejorProm = Infinity;
@@ -448,24 +379,21 @@ function graficar() {
     Object.keys(porProveedor).forEach(p => {
       const cant = porProveedor[p].cantidad;
       const prom = cant ? porProveedor[p].total / cant : Infinity;
-
       if (prom < mejorProm) {
         mejorProm = prom;
         mejor = p;
       }
     });
 
-    if (mejor) {
-      mejorProveedor.innerHTML = `🏆 <b>Mejor proveedor para "${prod}"</b>: ${mejor} (Promedio ponderado: ${money(mejorProm)})`;
-    } else {
-      mejorProveedor.innerHTML = "";
-    }
+    mejorProveedor.innerHTML = mejor
+      ? `🏆 <b>Mejor proveedor para "${prod}"</b>: ${mejor} (Promedio: ${money(mejorProm)})`
+      : "";
   } else {
     mejorProveedor.innerHTML = "";
   }
 }
 
-/* =================== EXPORTAR EXCEL (2 HOJAS) =================== */
+/* =================== EXPORTAR =================== */
 
 function exportarExcel() {
   const lista = filtrarRegistros(registros);
@@ -475,7 +403,6 @@ function exportarExcel() {
     return;
   }
 
-  // Hoja 1: Compras (detalle)
   const detalle = lista.map(r => ({
     Proveedor: r.proveedor,
     Producto: r.producto,
@@ -488,8 +415,6 @@ function exportarExcel() {
     Nota: r.nota
   }));
 
-  // Hoja 2: Resumen por producto + fecha + proveedor
-  // (esto es lo que pediste: que sí diga si fue 1 proveedor o varios)
   const resumenMap = {};
 
   lista.forEach(r => {
@@ -510,44 +435,48 @@ function exportarExcel() {
     resumenMap[key].Total += r.total || 0;
   });
 
-  const resumen = Object.values(resumenMap)
-    .sort((a, b) => (a.Fecha || "").localeCompare(b.Fecha || ""));
+  const resumen = Object.values(resumenMap).sort((a, b) => (a.Fecha || "").localeCompare(b.Fecha || ""));
 
-  // Excel
   const wb = XLSX.utils.book_new();
-
-  const ws1 = XLSX.utils.json_to_sheet(detalle);
-  XLSX.utils.book_append_sheet(wb, ws1, "Compras");
-
-  const ws2 = XLSX.utils.json_to_sheet(resumen);
-  XLSX.utils.book_append_sheet(wb, ws2, "Resumen Producto-Fecha");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalle), "Compras");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumen), "Resumen Producto-Fecha");
 
   XLSX.writeFile(wb, "Compras_LaBonita.xlsx");
 }
 
-/* =================== PINTAR TODO =================== */
+/* =================== MAIN =================== */
 
-function pintarTodo() {
-  mostrarTabla();
-  actualizarDashboard();
-  cargarSelectorProductos();
-  actualizarProveedoresDeProducto();
+async function cargarDatos() {
+  try {
+    const res = await fetch(CSV_URL, { cache: "no-store" });
+    const csv = await res.text();
+
+    registros = parseCSV(csv);
+
+    registros.sort((a, b) => {
+      const da = a.fechaCompra ? a.fechaCompra.getTime() : 0;
+      const db = b.fechaCompra ? b.fechaCompra.getTime() : 0;
+      return db - da;
+    });
+
+    mostrarTabla();
+    actualizarDashboard();
+    cargarSelectorProductos();
+    actualizarProveedoresDeProducto();
+  } catch (err) {
+    console.error(err);
+    alert("No se pudieron cargar los datos. Revisa permisos del Sheet.");
+  }
 }
 
-/* =================== EVENTOS =================== */
-
 window.onload = () => {
-  // Link del Form
-  const btn = document.getElementById("btnAbrirForm");
-  btn.href = FORM_URL;
+  document.getElementById("btnAbrirForm").href = FORM_URL;
 
-  // Buscar
   document.getElementById("buscador").addEventListener("input", () => {
     mostrarTabla();
     actualizarDashboard();
   });
 
-  // Filtros fecha
   document.getElementById("fechaInicio").addEventListener("change", () => {
     mostrarTabla();
     actualizarDashboard();
@@ -558,7 +487,6 @@ window.onload = () => {
     actualizarDashboard();
   });
 
-  // Selectores análisis
   document.getElementById("selectorProducto").addEventListener("change", () => {
     actualizarProveedoresDeProducto();
   });
@@ -567,8 +495,13 @@ window.onload = () => {
     graficar();
   });
 
-  // Cargar
+  document.getElementById("btnExportar").addEventListener("click", () => {
+    exportarExcel();
+  });
+
   cargarDatos();
 };
+
+
 
 
