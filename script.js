@@ -1,17 +1,7 @@
-/********************************************************
- * LA BONITA - ERP COMPRAS (Frontend)
- * Lee/Escribe en Google Sheets vía Apps Script
- ********************************************************/
-
-const URL_GOOGLE = "https://script.google.com/macros/s/AKfycbzoBfDo7oOnX28IVm0T29VFieT6T2wnMfj35rc1WtiwU514iU1vuIv8un-AT92JSofMyw/exec
-";
+const URL_GOOGLE = "https://script.google.com/macros/s/AKfycbxVzDzyLA2pb2Zhsti1ttd9SpLt79ldnCdLGjoDxlgKSuDFRTw1ssWdFsY9xnu-5rLAow/exec";
 
 let datos = [];
 let graficaActual = null;
-
-// Modo edición
-let modoEdicion = false;
-let idEditando = null;
 
 /* ================= UTILIDADES ================= */
 
@@ -24,45 +14,23 @@ function safeStr(x) {
   return (x ?? "").toString().trim();
 }
 
-function toDateInputValue(valor) {
-  if (!valor) return "";
-  try {
-    return new Date(valor).toISOString().split("T")[0];
-  } catch {
-    return "";
-  }
-}
-
-/* ================= FETCH GET ================= */
+/* ================= CARGAR DATOS ================= */
 
 async function cargarDatos() {
-  const res = await fetch(URL_GOOGLE);
-  const json = await res.json();
+  try {
+    const res = await fetch(URL_GOOGLE);
+    const json = await res.json();
 
-  datos = json;
+    datos = json;
 
-  mostrar();
-  actualizarDashboard();
-  cargarSelectorProductos();
-  actualizarProveedoresDeProducto();
-}
-
-/* ================= FETCH POST (SIN CORS PRE-FLIGHT) ================= */
-/**
- * IMPORTANTE:
- * GitHub Pages + Apps Script suelen bloquear CORS cuando mandas JSON con headers.
- * Por eso mandamos como FormData, así NO dispara preflight.
- */
-async function postGoogle(payload) {
-  const form = new FormData();
-  form.append("data", JSON.stringify(payload));
-
-  const res = await fetch(URL_GOOGLE, {
-    method: "POST",
-    body: form
-  });
-
-  return await res.json().catch(() => ({}));
+    mostrar();
+    actualizarDashboard();
+    cargarSelectorProductos();
+    actualizarProveedoresDeProducto();
+  } catch (e) {
+    console.error("Error cargando datos:", e);
+    alert("No se pudieron cargar los datos. Revisa el Apps Script.");
+  }
 }
 
 /* ================= MOSTRAR TABLA ================= */
@@ -73,7 +41,7 @@ function mostrar() {
 
   tabla.innerHTML = "";
 
-  // ORDEN REAL EN SHEETS:
+  // ORDEN CON ID:
   // 0 ID
   // 1 PROVEEDOR
   // 2 PRODUCTO
@@ -84,7 +52,7 @@ function mostrar() {
   // 7 NOTAS
 
   datos.slice(1).forEach((fila) => {
-    const id = Number(fila[0]);
+    const id = safeStr(fila[0]);
     const proveedor = safeStr(fila[1]);
     const producto = safeStr(fila[2]);
 
@@ -101,6 +69,7 @@ function mostrar() {
 
     tabla.innerHTML += `
       <tr>
+        <td>${id}</td>
         <td>${proveedor}</td>
         <td>${producto}</td>
         <td>${cantidad}</td>
@@ -108,21 +77,8 @@ function mostrar() {
         <td>${money(total)}</td>
         <td>${fecha}</td>
         <td>${notas}</td>
-        <td class="acciones">
-          <button class="btn-mini btn-edit" data-id="${id}">Editar</button>
-          <button class="btn-mini btn-del" data-id="${id}">Borrar</button>
-        </td>
       </tr>
     `;
-  });
-
-  // Eventos de botones (SIN onclick inline)
-  document.querySelectorAll(".btn-edit").forEach(btn => {
-    btn.addEventListener("click", () => cargarEdicion(btn.dataset.id));
-  });
-
-  document.querySelectorAll(".btn-del").forEach(btn => {
-    btn.addEventListener("click", () => eliminar(btn.dataset.id));
   });
 }
 
@@ -152,7 +108,6 @@ function actualizarDashboard() {
 
   let top = "-";
   let max = 0;
-
   Object.keys(resumenCantidad).forEach(p => {
     if (resumenCantidad[p] > max) {
       max = resumenCantidad[p];
@@ -166,113 +121,7 @@ function actualizarDashboard() {
   document.getElementById("promedioGeneral").innerText = money(promedioGeneral);
 }
 
-/* ================= GUARDAR / EDITAR ================= */
-
-async function guardarRegistro() {
-  const proveedor = safeStr(document.getElementById("proveedor").value);
-  const producto = safeStr(document.getElementById("producto").value);
-  const cantidad = Number(document.getElementById("cantidad").value);
-  const costo = Number(document.getElementById("costo").value);
-  const fecha = document.getElementById("fecha").value;
-  const notas = safeStr(document.getElementById("notas").value);
-
-  if (!proveedor || !producto || !cantidad || !costo || !fecha) {
-    alert("Completa los campos obligatorios");
-    return;
-  }
-
-  if (modoEdicion) {
-    await postGoogle({
-      accion: "editar",
-      id: Number(idEditando),
-      proveedor,
-      producto,
-      cantidad,
-      costo,
-      fecha,
-      notas
-    });
-
-    cancelarEdicion();
-  } else {
-    await postGoogle({
-      accion: "agregar",
-      proveedor,
-      producto,
-      cantidad,
-      costo,
-      fecha,
-      notas
-    });
-
-    limpiarFormulario();
-  }
-
-  await cargarDatos();
-}
-
-/* ================= CARGAR EDICION ================= */
-
-function cargarEdicion(id) {
-  id = Number(id);
-
-  const registros = datos.slice(1);
-  const fila = registros.find(f => Number(f[0]) === id);
-  if (!fila) return;
-
-  document.getElementById("proveedor").value = safeStr(fila[1]);
-  document.getElementById("producto").value = safeStr(fila[2]);
-  document.getElementById("cantidad").value = fila[3] ?? "";
-  document.getElementById("costo").value = fila[4] ?? "";
-  document.getElementById("fecha").value = toDateInputValue(fila[6]);
-  document.getElementById("notas").value = safeStr(fila[7]);
-
-  modoEdicion = true;
-  idEditando = id;
-
-  document.getElementById("btnGuardar").innerText = "Actualizar";
-  document.getElementById("btnCancelar").style.display = "inline-block";
-  document.getElementById("tituloFormulario").innerText = "Editar Compra";
-}
-
-/* ================= CANCELAR EDICION ================= */
-
-function cancelarEdicion() {
-  modoEdicion = false;
-  idEditando = null;
-
-  limpiarFormulario();
-
-  document.getElementById("btnGuardar").innerText = "Registrar";
-  document.getElementById("btnCancelar").style.display = "none";
-  document.getElementById("tituloFormulario").innerText = "Registro de Compras";
-}
-
-/* ================= LIMPIAR ================= */
-
-function limpiarFormulario() {
-  document.getElementById("proveedor").value = "";
-  document.getElementById("producto").value = "";
-  document.getElementById("cantidad").value = "";
-  document.getElementById("costo").value = "";
-  document.getElementById("fecha").value = "";
-  document.getElementById("notas").value = "";
-}
-
-/* ================= ELIMINAR ================= */
-
-async function eliminar(id) {
-  if (!confirm("¿Seguro que deseas borrar este registro?")) return;
-
-  await postGoogle({
-    accion: "eliminar",
-    id: Number(id)
-  });
-
-  await cargarDatos();
-}
-
-/* ================= EXPORTAR EXCEL ================= */
+/* ================= EXPORTAR ================= */
 
 function exportarExcel() {
   const exportar = datos.slice(1).map(f => ({
@@ -315,9 +164,7 @@ function actualizarProveedoresDeProducto() {
     datos.slice(1)
       .filter(f => safeStr(f[2]) === safeStr(producto))
       .map(f => safeStr(f[1]))
-  )]
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
+  )].filter(Boolean).sort((a, b) => a.localeCompare(b));
 
   selectorProveedor.innerHTML = `<option value="__TODOS__">Todos los proveedores</option>`;
 
@@ -355,9 +202,7 @@ function graficar() {
     data: {
       labels,
       datasets: [{
-        label: prov === "__TODOS__"
-          ? `Costo general: ${prod}`
-          : `Costo ${prov}: ${prod}`,
+        label: prov === "__TODOS__" ? `Costo general: ${prod}` : `Costo ${prov}: ${prod}`,
         data: precios,
         borderColor: "#C29B40",
         fill: false
@@ -379,11 +224,9 @@ function graficar() {
 
     if (precios.length >= 2) {
       const diff = ultimo - precios[precios.length - 2];
-      texto += diff > 0
-        ? ` • 🔺 Subió ${money(diff)}`
-        : diff < 0
-          ? ` • 🔻 Bajó ${money(Math.abs(diff))}`
-          : ` • ➖ Sin cambio`;
+      texto += diff > 0 ? ` • 🔺 Subió ${money(diff)}`
+        : diff < 0 ? ` • 🔻 Bajó ${money(Math.abs(diff))}`
+        : ` • ➖ Sin cambio`;
     }
 
     variacion.innerText = texto;
@@ -432,25 +275,8 @@ function graficar() {
   }
 }
 
-/* ================= EVENTOS ================= */
-
-function conectarEventos() {
-  document.getElementById("btnGuardar").addEventListener("click", guardarRegistro);
-  document.getElementById("btnCancelar").addEventListener("click", cancelarEdicion);
-
-  document.getElementById("btnExportar").addEventListener("click", exportarExcel);
-
-  document.getElementById("buscador").addEventListener("keyup", mostrar);
-
-  document.getElementById("selectorProducto").addEventListener("change", actualizarProveedoresDeProducto);
-  document.getElementById("selectorProveedor").addEventListener("change", graficar);
-  document.getElementById("btnGraficar").addEventListener("click", graficar);
-}
-
 /* ================= INICIO ================= */
 
-window.addEventListener("load", async () => {
-  conectarEventos();
-  await cargarDatos();
-});
-
+window.onload = () => {
+  cargarDatos();
+};
