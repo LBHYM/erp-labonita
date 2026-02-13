@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>La Bonita | ERP Compras</title>
 
   <link rel="stylesheet" href="styles.css" />
@@ -12,18 +12,25 @@
 </head>
 
 <body>
+
   <div id="sistema" class="app">
 
+    <!-- TOPBAR -->
     <header class="topbar">
       <div class="topbar-left">
-        <img src="logo.png" alt="La Bonita" class="topbar-logo">
+        <img src="logo.png" alt="La Bonita" class="topbar-logo" />
         <div>
           <div class="topbar-title">ERP Compras</div>
           <div class="topbar-sub">La Bonita, Helados y Más…</div>
         </div>
       </div>
+
+      <div class="topbar-right">
+        <span class="pill">Modo seguro</span>
+      </div>
     </header>
 
+    <!-- CONTENIDO -->
     <main class="content">
 
       <!-- DASHBOARD -->
@@ -49,62 +56,54 @@
         </div>
       </section>
 
-      <!-- MODULO COMPRAS -->
+      <!-- ACCIONES -->
       <section class="panel">
         <div class="panel-header">
           <div>
-            <h3 id="tituloFormulario">Registro de Compras</h3>
-            <p>Captura compras de proveedores y consulta historial.</p>
+            <h3>Registro de Compras</h3>
+            <p>Para registrar nuevas compras usa el formulario. No se rompe y funciona desde celular.</p>
+          </div>
+          <span class="badge">Registro</span>
+        </div>
+
+        <div class="acciones-wrap">
+          <a class="btn-primary"
+             id="btnForms"
+             href="https://docs.google.com/forms/d/e/1FAIpQLScU3WYqUEGqQmgcWajim9ZZvBcpwt8ZOONEOOSzRCueI9xygQ/viewform"
+             target="_blank">
+             ➕ Registrar compra (Google Forms)
+          </a>
+
+          <button class="btn-secondary" onclick="cargarDatos()">
+            🔄 Actualizar tabla
+          </button>
+        </div>
+
+        <div class="hint" style="padding-top:0;">
+          <b>Tip:</b> Si registras desde el celular, luego aquí presiona <b>Actualizar tabla</b>.
+        </div>
+      </section>
+
+      <!-- HISTORIAL -->
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>Historial de Compras</h3>
+            <p>Consulta, busca, exporta y analiza.</p>
           </div>
           <span class="badge">Compras</span>
         </div>
 
-        <div class="form-grid">
-          <div class="field">
-            <label>Proveedor</label>
-            <input id="proveedor" placeholder="Ej. COSTCO">
-          </div>
-
-          <div class="field">
-            <label>Producto</label>
-            <input id="producto" placeholder="Ej. Fresa caja 10kg">
-          </div>
-
-          <div class="field">
-            <label>Cantidad</label>
-            <input id="cantidad" type="number" placeholder="Ej. 40">
-          </div>
-
-          <div class="field">
-            <label>Costo unitario</label>
-            <input id="costo" type="number" step="0.01" placeholder="Ej. 23.00">
-          </div>
-
-          <div class="field">
-            <label>Fecha</label>
-            <input id="fecha" type="date">
-          </div>
-
-          <div class="field">
-            <label>Notas</label>
-            <input id="notas" placeholder="Ej. Compra semanal">
-          </div>
-        </div>
-
-        <div class="form-actions">
-          <button class="btn-primary" id="btnGuardar">Registrar</button>
-          <button class="btn-danger" id="btnCancelar" style="display:none;">Cancelar</button>
-        </div>
-
         <div class="toolbar">
-          <input id="buscador" placeholder="Buscar proveedor o producto...">
-          <button class="btn-secondary" id="btnExportar">Exportar Excel</button>
+          <input id="buscador" placeholder="Buscar proveedor o producto..." onkeyup="mostrar()" />
+          <button class="btn-secondary" onclick="exportarExcel()">Exportar Excel</button>
         </div>
 
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th>ID</th>
                 <th>Proveedor</th>
                 <th>Producto</th>
                 <th>Cantidad</th>
@@ -112,7 +111,6 @@
                 <th>Total</th>
                 <th>Fecha</th>
                 <th>Notas</th>
-                <th>Acciones</th>
               </tr>
             </thead>
             <tbody id="tabla"></tbody>
@@ -131,14 +129,13 @@
         </div>
 
         <div class="toolbar">
-          <select id="selectorProducto"></select>
-          <select id="selectorProveedor"></select>
-          <button class="btn-secondary" id="btnGraficar">Actualizar</button>
+          <select id="selectorProducto" onchange="actualizarProveedoresDeProducto()"></select>
+          <select id="selectorProveedor" onchange="graficar()"></select>
         </div>
 
         <div class="hint">
-          <b>Modo:</b> Si eliges “Todos los proveedores”, verás el promedio general del producto.
-          Si eliges un proveedor, verás solo ese proveedor.
+          <b>Modo:</b> “Todos los proveedores” = promedio general ponderado.  
+          Si eliges un proveedor, ves solo ese proveedor.
         </div>
 
         <div class="chart-wrap">
@@ -159,3 +156,4 @@
   <script src="script.js"></script>
 </body>
 </html>
+
