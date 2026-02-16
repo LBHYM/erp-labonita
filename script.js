@@ -1,267 +1,267 @@
-/* =========================================================
-   LA BONITA - ERP COMPRAS (MODO GRATIS SIN APPS SCRIPT)
-   - Lee datos desde Google Sheets como CSV
-   - Registra compras desde Google Form
-   ========================================================= */
+/* ===========================
+   CONFIGURACION
+=========================== */
 
-const SHEET_ID = "1TyDxOtgkaxqhPCPTCSkpCkE7aCkZTNiC1XvS1AmiNnw";
-const GID_RESPUESTAS = "1801367087";
-
+// 1) TU FORM (para registrar)
 const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScU3WYqUEGqQmgcWajim9ZZvBcpwt8ZOONEOOSzRCueI9xygQ/viewform";
 
-const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${GID_RESPUESTAS}`;
+// 2) TU SHEET PUBLICADO COMO CSV (YA PUESTO)
+const SHEET_CSV_URL =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQtVGAhTNEJpkWKmTnzUMtiumBO8voTHx56Rds_oHCzzyRI-hXBuAlXKpSJoymnhhPQS4O5jkmHTWRL/pub?gid=1801367087&single=true&output=csv";
 
-let registros = [];
+/* ===========================
+   VARIABLES
+=========================== */
+
+let datos = [];
 let graficaActual = null;
 
-/* =================== HELPERS =================== */
+/* ===========================
+   UTILIDADES
+=========================== */
+
+function safeStr(x) {
+  return (x ?? "").toString().trim();
+}
 
 function money(n) {
   const num = Number(n) || 0;
   return "$" + num.toFixed(2);
 }
 
-function safeStr(x) {
-  return (x ?? "").toString().trim();
+function parseNumber(n) {
+  if (n === null || n === undefined) return 0;
+
+  // Si viene como "350.00" o "367,25"
+  const s = n.toString().replace(",", ".");
+  const val = Number(s);
+  return isNaN(val) ? 0 : val;
 }
 
-function normalizarFecha(valor) {
+function parseFecha(valor) {
   if (!valor) return null;
-  const s = safeStr(valor);
 
-  // yyyy-mm-dd
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
-    const d = new Date(s);
-    return isNaN(d) ? null : d;
+  // Si viene como "13/02/2026" (Forms)
+  if (valor.includes("/")) {
+    const [d, m, y] = valor.split("/");
+    return new Date(Number(y), Number(m) - 1, Number(d));
   }
 
-  // dd/mm/yyyy
-  if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
-    const [dd, mm, yyyy] = s.split("/");
-    const d = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
-    return isNaN(d) ? null : d;
-  }
-
-  const d = new Date(s);
-  return isNaN(d) ? null : d;
+  // Si viene como ISO
+  return new Date(valor);
 }
 
-function fechaToISO(d) {
-  if (!d) return "";
-  return new Date(d).toISOString().split("T")[0];
+function toDateOnly(fecha) {
+  if (!fecha) return "";
+  const d = new Date(fecha);
+  if (isNaN(d.getTime())) return "";
+  return d.toISOString().split("T")[0];
 }
 
-/* =================== CSV PARSER =================== */
+/* ===========================
+   CSV -> ARRAY
+=========================== */
 
-function parseCSVLine(line) {
-  const result = [];
+function csvToArray(text) {
+  const rows = [];
+  let row = [];
   let current = "";
-  let inQuotes = false;
+  let insideQuotes = false;
 
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const next = text[i + 1];
 
-    if (char === '"' && line[i + 1] === '"') {
+    if (char === '"' && insideQuotes && next === '"') {
       current += '"';
       i++;
       continue;
     }
 
     if (char === '"') {
-      inQuotes = !inQuotes;
+      insideQuotes = !insideQuotes;
       continue;
     }
 
-    if (char === "," && !inQuotes) {
-      result.push(current);
+    if (char === "," && !insideQuotes) {
+      row.push(current);
       current = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !insideQuotes) {
+      if (current.length || row.length) {
+        row.push(current);
+        rows.push(row);
+        row = [];
+        current = "";
+      }
       continue;
     }
 
     current += char;
   }
 
-  result.push(current);
-  return result.map(x => safeStr(x));
-}
-
-function parseCSV(text) {
-  const lines = text
-    .split("\n")
-    .map(l => l.trim())
-    .filter(Boolean);
-
-  if (!lines.length) return [];
-
-  const rows = lines.map(parseCSVLine);
-
-  const header = rows[0].map(h => safeStr(h).toLowerCase());
-
-  const idx = {
-    timestamp: header.findIndex(h => h.includes("marca") || h.includes("timestamp")),
-    proveedor: header.findIndex(h => h.includes("proveedor")),
-    producto: header.findIndex(h => h.includes("producto")),
-    cantidad: header.findIndex(h => h.includes("cantidad")),
-    costo: header.findIndex(h => h.includes("costo")),
-    fecha: header.findIndex(h => h.includes("fecha")),
-    nota: header.findIndex(h => h.includes("nota")),
-    estatus: header.findIndex(h => h.includes("estatus")),
-    pago: header.findIndex(h => h.includes("pago"))
-  };
-
-  const dataRows = rows.slice(1);
-
-  const objs = dataRows.map((r, i) => {
-    const proveedor = safeStr(r[idx.proveedor]);
-    const producto = safeStr(r[idx.producto]);
-
-    const cantidad = Number((r[idx.cantidad] || "").replace(",", ".")) || 0;
-    const costo = Number((r[idx.costo] || "").replace(",", ".")) || 0;
-
-    const total = cantidad * costo;
-
-    const fechaCompra = normalizarFecha(r[idx.fecha]);
-    const nota = safeStr(r[idx.nota]);
-    const estatus = safeStr(r[idx.estatus]);
-    const pago = safeStr(r[idx.pago]);
-
-    const id = `${safeStr(r[idx.timestamp])}-${proveedor}-${producto}-${i}`;
-
-    return {
-      id,
-      proveedor,
-      producto,
-      cantidad,
-      costo,
-      total,
-      fechaCompra,
-      nota,
-      estatus,
-      pago
-    };
-  });
-
-  return objs.filter(o => o.proveedor || o.producto);
-}
-
-/* =================== FILTROS =================== */
-
-function getFiltros() {
-  const buscador = document.getElementById("buscador");
-  const fechaInicio = document.getElementById("fechaInicio");
-  const fechaFin = document.getElementById("fechaFin");
-
-  const q = buscador ? safeStr(buscador.value).toLowerCase() : "";
-
-  const ini = fechaInicio ? fechaInicio.value : "";
-  const fin = fechaFin ? fechaFin.value : "";
-
-  const dIni = ini ? new Date(ini + "T00:00:00") : null;
-  const dFin = fin ? new Date(fin + "T23:59:59") : null;
-
-  return { q, dIni, dFin };
-}
-
-function filtrarRegistros(lista) {
-  const { q, dIni, dFin } = getFiltros();
-
-  return lista.filter(r => {
-    if (q) {
-      const ok =
-        r.proveedor.toLowerCase().includes(q) ||
-        r.producto.toLowerCase().includes(q);
-      if (!ok) return false;
-    }
-
-    if ((dIni || dFin) && !r.fechaCompra) return false;
-
-    if (dIni && r.fechaCompra < dIni) return false;
-    if (dFin && r.fechaCompra > dFin) return false;
-
-    return true;
-  });
-}
-
-/* =================== UI =================== */
-
-function tagHTML(texto, tipo) {
-  const t = safeStr(texto);
-  if (!t) return `<span class="tag neutral">—</span>`;
-  return `<span class="tag ${tipo}">${t}</span>`;
-}
-
-function mostrarTabla() {
-  const tbody = document.getElementById("tabla");
-  tbody.innerHTML = "";
-
-  const lista = filtrarRegistros(registros);
-
-  if (!lista.length) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="9" style="padding:18px; opacity:.75;">
-          No hay registros con estos filtros.
-        </td>
-      </tr>
-    `;
-    return;
+  if (current.length || row.length) {
+    row.push(current);
+    rows.push(row);
   }
 
-  lista.forEach(r => {
-    const fecha = r.fechaCompra ? r.fechaCompra.toLocaleDateString() : "—";
+  return rows;
+}
 
-    const estatus = safeStr(r.estatus).toLowerCase();
-    const pago = safeStr(r.pago).toLowerCase();
+/* ===========================
+   CARGAR DATOS
+=========================== */
 
-    const estatusTag =
-      estatus.includes("recib") || estatus.includes("ok")
-        ? tagHTML(r.estatus, "ok")
-        : estatus.includes("pend") || estatus.includes("falta")
-          ? tagHTML(r.estatus, "warn")
-          : tagHTML(r.estatus, "neutral");
+async function cargarDatos() {
+  try {
+    const res = await fetch(SHEET_CSV_URL);
+    const csv = await res.text();
 
-    const pagoTag =
-      pago.includes("pag") || pago.includes("liquid")
-        ? tagHTML(r.pago, "ok")
-        : pago.includes("pend")
-          ? tagHTML(r.pago, "warn")
-          : tagHTML(r.pago, "neutral");
+    const arr = csvToArray(csv);
 
-    tbody.innerHTML += `
+    // Encabezados (Forms)
+    // Marca temporal | Proveedor | Producto | Cantidad | Costo unitario | Fecha | Nota | Estatus | Pago
+    const headers = arr[0].map(h => safeStr(h).toLowerCase());
+
+    const idx = {
+      proveedor: headers.indexOf("proveedor"),
+      producto: headers.indexOf("producto"),
+      cantidad: headers.indexOf("cantidad"),
+      costo: headers.indexOf("costo unitario"),
+      fecha: headers.indexOf("fecha"),
+      nota: headers.indexOf("nota"),
+      estatus: headers.indexOf("estatus"),
+      pago: headers.indexOf("pago"),
+    };
+
+    const registros = arr.slice(1).filter(r => r.length > 1);
+
+    datos = registros.map(r => {
+      const proveedor = safeStr(r[idx.proveedor]);
+      const producto = safeStr(r[idx.producto]);
+
+      const cantidad = parseNumber(r[idx.cantidad]);
+      const costo = parseNumber(r[idx.costo]);
+      const fecha = parseFecha(r[idx.fecha]);
+
+      const nota = safeStr(r[idx.nota]);
+      const estatus = safeStr(r[idx.estatus]);
+      const pago = safeStr(r[idx.pago]);
+
+      const total = cantidad * costo;
+
+      return {
+        proveedor,
+        producto,
+        cantidad,
+        costo,
+        total,
+        fecha,
+        nota,
+        estatus,
+        pago,
+      };
+    });
+
+    // Ordenar por fecha DESC
+    datos.sort((a, b) => (b.fecha?.getTime() || 0) - (a.fecha?.getTime() || 0));
+
+    // Pintar todo
+    mostrar();
+    actualizarDashboard();
+    cargarSelectorProductos();
+    actualizarProveedoresDeProducto();
+    graficar();
+    resumenTotales();
+  } catch (err) {
+    console.error(err);
+    alert("No pude leer el CSV. Revisa que esté publicado en la web como CSV.");
+  }
+}
+
+/* ===========================
+   FILTROS
+=========================== */
+
+function getFiltros() {
+  const buscador = safeStr(document.getElementById("buscador").value).toLowerCase();
+  const inicio = document.getElementById("fechaInicio").value;
+  const fin = document.getElementById("fechaFin").value;
+
+  const dInicio = inicio ? new Date(inicio + "T00:00:00") : null;
+  const dFin = fin ? new Date(fin + "T23:59:59") : null;
+
+  return { buscador, dInicio, dFin };
+}
+
+function pasaFiltro(item) {
+  const { buscador, dInicio, dFin } = getFiltros();
+
+  if (buscador) {
+    const p = (item.proveedor || "").toLowerCase();
+    const pr = (item.producto || "").toLowerCase();
+    if (!p.includes(buscador) && !pr.includes(buscador)) return false;
+  }
+
+  if (dInicio && item.fecha && item.fecha < dInicio) return false;
+  if (dFin && item.fecha && item.fecha > dFin) return false;
+
+  return true;
+}
+
+/* ===========================
+   TABLA
+=========================== */
+
+function mostrar() {
+  const tabla = document.getElementById("tabla");
+  tabla.innerHTML = "";
+
+  const filtrados = datos.filter(pasaFiltro);
+
+  filtrados.forEach(item => {
+    tabla.innerHTML += `
       <tr>
-        <td>${r.proveedor}</td>
-        <td>${r.producto}</td>
-        <td>${r.cantidad}</td>
-        <td>${money(r.costo)}</td>
-        <td><b>${money(r.total)}</b></td>
-        <td>${fecha}</td>
-        <td>${estatusTag}</td>
-        <td>${pagoTag}</td>
-        <td>${r.nota || ""}</td>
+        <td>${safeStr(item.proveedor)}</td>
+        <td>${safeStr(item.producto)}</td>
+        <td>${item.cantidad}</td>
+        <td>${money(item.costo)}</td>
+        <td><b>${money(item.total)}</b></td>
+        <td>${item.fecha ? item.fecha.toLocaleDateString() : ""}</td>
+        <td>${safeStr(item.estatus) || "-"}</td>
+        <td>${safeStr(item.pago) || "-"}</td>
+        <td>${safeStr(item.nota)}</td>
       </tr>
     `;
   });
+
+  document.getElementById("totalCompras").innerText = filtrados.length;
 }
 
+/* ===========================
+   DASHBOARD
+=========================== */
+
 function actualizarDashboard() {
-  const lista = filtrarRegistros(registros);
+  const filtrados = datos.filter(pasaFiltro);
 
   let totalInvertido = 0;
   let resumenCantidad = {};
 
-  lista.forEach(r => {
-    totalInvertido += r.total || 0;
+  filtrados.forEach(x => {
+    totalInvertido += x.total;
 
-    const p = r.producto || "—";
-    if (!resumenCantidad[p]) resumenCantidad[p] = 0;
-    resumenCantidad[p] += r.cantidad || 0;
+    if (!resumenCantidad[x.producto]) resumenCantidad[x.producto] = 0;
+    resumenCantidad[x.producto] += x.cantidad;
   });
 
   document.getElementById("totalInvertido").innerText = money(totalInvertido);
-  document.getElementById("totalCompras").innerText = lista.length;
 
   let top = "-";
   let max = 0;
+
   Object.keys(resumenCantidad).forEach(p => {
     if (resumenCantidad[p] > max) {
       max = resumenCantidad[p];
@@ -271,44 +271,68 @@ function actualizarDashboard() {
 
   document.getElementById("productoTop").innerText = top;
 
-  const promedio = lista.length ? totalInvertido / lista.length : 0;
-  document.getElementById("promedioGeneral").innerText = money(promedio);
+  // Promedio ponderado del producto seleccionado
+  const prodSel = document.getElementById("selectorProducto").value;
+  const prom = promedioPonderado(prodSel, filtrados);
+  document.getElementById("promedioProducto").innerText = prom ? money(prom) : "$0";
 }
 
-/* =================== ANALISIS =================== */
+/* ===========================
+   PROMEDIO PONDERADO
+=========================== */
+
+function promedioPonderado(producto, lista) {
+  if (!producto) return 0;
+
+  const rows = lista.filter(x => safeStr(x.producto) === safeStr(producto));
+  if (!rows.length) return 0;
+
+  const totalGastado = rows.reduce((a, b) => a + (b.total || 0), 0);
+  const totalCantidad = rows.reduce((a, b) => a + (b.cantidad || 0), 0);
+
+  if (!totalCantidad) return 0;
+  return totalGastado / totalCantidad;
+}
+
+/* ===========================
+   SELECTORES
+=========================== */
 
 function cargarSelectorProductos() {
-  const sel = document.getElementById("selectorProducto");
+  const selector = document.getElementById("selectorProducto");
+  selector.innerHTML = "";
 
-  const productos = [...new Set(registros.map(r => r.producto))]
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
+  const filtrados = datos.filter(pasaFiltro);
+  const productos = [...new Set(filtrados.map(x => x.producto))].filter(Boolean).sort();
 
-  sel.innerHTML = "";
   productos.forEach(p => {
-    sel.innerHTML += `<option value="${p}">${p}</option>`;
+    selector.innerHTML += `<option value="${p}">${p}</option>`;
   });
 
-  if (!productos.length) {
-    sel.innerHTML = `<option value="">Sin productos</option>`;
-  }
+  if (!selector.value && productos.length) selector.value = productos[0];
 }
 
 function actualizarProveedoresDeProducto() {
   const prod = document.getElementById("selectorProducto").value;
-  const sel = document.getElementById("selectorProveedor");
+  const selectorProveedor = document.getElementById("selectorProveedor");
 
+  const filtrados = datos.filter(pasaFiltro);
   const proveedores = [...new Set(
-    registros.filter(r => r.producto === prod).map(r => r.proveedor)
-  )].filter(Boolean).sort((a, b) => a.localeCompare(b));
+    filtrados
+      .filter(x => safeStr(x.producto) === safeStr(prod))
+      .map(x => x.proveedor)
+  )].filter(Boolean).sort();
 
-  sel.innerHTML = `<option value="__TODOS__">Todos los proveedores</option>`;
+  selectorProveedor.innerHTML = `<option value="__TODOS__">Todos los proveedores</option>`;
+
   proveedores.forEach(p => {
-    sel.innerHTML += `<option value="${p}">${p}</option>`;
+    selectorProveedor.innerHTML += `<option value="${p}">${p}</option>`;
   });
-
-  graficar();
 }
+
+/* ===========================
+   GRAFICA
+=========================== */
 
 function graficar() {
   const prod = document.getElementById("selectorProducto").value;
@@ -317,22 +341,18 @@ function graficar() {
   const variacion = document.getElementById("variacion");
   const mejorProveedor = document.getElementById("mejorProveedor");
 
-  if (!prod) return;
+  const filtrados = datos.filter(pasaFiltro);
 
-  let historial = registros.filter(r => r.producto === prod);
+  let historial = filtrados.filter(x => safeStr(x.producto) === safeStr(prod));
 
   if (prov !== "__TODOS__") {
-    historial = historial.filter(r => r.proveedor === prov);
+    historial = historial.filter(x => safeStr(x.proveedor) === safeStr(prov));
   }
 
-  historial.sort((a, b) => {
-    const da = a.fechaCompra ? a.fechaCompra.getTime() : 0;
-    const db = b.fechaCompra ? b.fechaCompra.getTime() : 0;
-    return da - db;
-  });
+  historial.sort((a, b) => (a.fecha?.getTime() || 0) - (b.fecha?.getTime() || 0));
 
-  const labels = historial.map(r => r.fechaCompra ? r.fechaCompra.toLocaleDateString() : "—");
-  const precios = historial.map(r => Number(r.costo) || 0);
+  const labels = historial.map(x => x.fecha ? x.fecha.toLocaleDateString() : "");
+  const precios = historial.map(x => x.costo);
 
   if (graficaActual) graficaActual.destroy();
 
@@ -341,9 +361,7 @@ function graficar() {
     data: {
       labels,
       datasets: [{
-        label: prov === "__TODOS__"
-          ? `Costo general: ${prod}`
-          : `Costo ${prov}: ${prod}`,
+        label: prov === "__TODOS__" ? `Costo general: ${prod}` : `Costo ${prov}: ${prod}`,
         data: precios,
         borderColor: "#C29B40",
         fill: false
@@ -355,23 +373,41 @@ function graficar() {
     }
   });
 
+  // Variación
   if (!precios.length) {
     variacion.innerText = "Sin datos para este filtro.";
   } else {
     const ultimo = precios[precios.length - 1];
     const promedio = precios.reduce((a, b) => a + b, 0) / precios.length;
-    variacion.innerText = `📌 Último costo: ${money(ultimo)} • Promedio: ${money(promedio)}`;
+
+    let texto = `📌 Último costo: ${money(ultimo)} • Promedio simple: ${money(promedio)}`;
+
+    if (precios.length >= 2) {
+      const diff = ultimo - precios[precios.length - 2];
+      texto += diff > 0 ? ` • 🔺 Subió ${money(diff)}`
+        : diff < 0 ? ` • 🔻 Bajó ${money(Math.abs(diff))}`
+        : ` • ➖ Sin cambio`;
+    }
+
+    // PROMEDIO PONDERADO (el bueno)
+    const promPond = promedioPonderado(prod, filtrados);
+    texto += ` • ⭐ Promedio ponderado real: ${money(promPond)}`;
+
+    variacion.innerText = texto;
   }
 
+  // Mejor proveedor (solo si todos)
   if (prov === "__TODOS__") {
     const porProveedor = {};
 
-    registros.filter(r => r.producto === prod).forEach(r => {
-      const p = r.proveedor;
-      if (!porProveedor[p]) porProveedor[p] = { cantidad: 0, total: 0 };
-      porProveedor[p].cantidad += r.cantidad || 0;
-      porProveedor[p].total += r.total || 0;
-    });
+    filtrados
+      .filter(x => safeStr(x.producto) === safeStr(prod))
+      .forEach(x => {
+        const p = safeStr(x.proveedor);
+        if (!porProveedor[p]) porProveedor[p] = { total: 0, cantidad: 0 };
+        porProveedor[p].total += x.total;
+        porProveedor[p].cantidad += x.cantidad;
+      });
 
     let mejor = null;
     let mejorProm = Infinity;
@@ -379,6 +415,7 @@ function graficar() {
     Object.keys(porProveedor).forEach(p => {
       const cant = porProveedor[p].cantidad;
       const prom = cant ? porProveedor[p].total / cant : Infinity;
+
       if (prom < mejorProm) {
         mejorProm = prom;
         mejor = p;
@@ -386,121 +423,197 @@ function graficar() {
     });
 
     mejorProveedor.innerHTML = mejor
-      ? `🏆 <b>Mejor proveedor para "${prod}"</b>: ${mejor} (Promedio: ${money(mejorProm)})`
+      ? `🏆 <b>Mejor proveedor para "${prod}"</b>: ${mejor} (Promedio ponderado: ${money(mejorProm)})`
       : "";
   } else {
     mejorProveedor.innerHTML = "";
   }
 }
 
-/* =================== EXPORTAR =================== */
+/* ===========================
+   RESUMEN TOTALES
+=========================== */
 
-function exportarExcel() {
-  const lista = filtrarRegistros(registros);
+function resumenTotales() {
+  const filtrados = datos.filter(pasaFiltro);
 
-  if (!lista.length) {
-    alert("No hay registros para exportar con estos filtros.");
-    return;
-  }
+  const porProducto = {};
+  const porProveedor = {};
 
-  const detalle = lista.map(r => ({
-    Proveedor: r.proveedor,
-    Producto: r.producto,
-    Cantidad: r.cantidad,
-    "Costo unitario": r.costo,
-    Total: r.total,
-    Fecha: r.fechaCompra ? fechaToISO(r.fechaCompra) : "",
-    Estatus: r.estatus,
-    Pago: r.pago,
-    Nota: r.nota
-  }));
+  filtrados.forEach(x => {
+    // producto
+    if (!porProducto[x.producto]) porProducto[x.producto] = { total: 0, cantidad: 0 };
+    porProducto[x.producto].total += x.total;
+    porProducto[x.producto].cantidad += x.cantidad;
 
-  const resumenMap = {};
-
-  lista.forEach(r => {
-    const fecha = r.fechaCompra ? fechaToISO(r.fechaCompra) : "SIN_FECHA";
-    const key = `${fecha}||${r.producto}||${r.proveedor}`;
-
-    if (!resumenMap[key]) {
-      resumenMap[key] = {
-        Fecha: fecha,
-        Producto: r.producto,
-        Proveedor: r.proveedor,
-        Cantidad: 0,
-        Total: 0
-      };
-    }
-
-    resumenMap[key].Cantidad += r.cantidad || 0;
-    resumenMap[key].Total += r.total || 0;
+    // proveedor
+    if (!porProveedor[x.proveedor]) porProveedor[x.proveedor] = { total: 0 };
+    porProveedor[x.proveedor].total += x.total;
   });
 
-  const resumen = Object.values(resumenMap).sort((a, b) => (a.Fecha || "").localeCompare(b.Fecha || ""));
+  // Producto
+  const contProd = document.getElementById("resumenProductos");
+  contProd.innerHTML = "";
 
+  Object.keys(porProducto)
+    .sort((a, b) => porProducto[b].total - porProducto[a].total)
+    .slice(0, 20)
+    .forEach(p => {
+      const total = porProducto[p].total;
+      const cant = porProducto[p].cantidad;
+      const prom = cant ? total / cant : 0;
+
+      contProd.innerHTML += `
+        <div class="resumen-item">
+          <div>
+            <b>${p}</b><br>
+            <span style="color:#7a7a7a;font-size:12px;">
+              Cantidad: ${cant} • Promedio ponderado: ${money(prom)}
+            </span>
+          </div>
+          <div><b>${money(total)}</b></div>
+        </div>
+      `;
+    });
+
+  // Proveedor
+  const contProv = document.getElementById("resumenProveedores");
+  contProv.innerHTML = "";
+
+  Object.keys(porProveedor)
+    .sort((a, b) => porProveedor[b].total - porProveedor[a].total)
+    .slice(0, 20)
+    .forEach(p => {
+      contProv.innerHTML += `
+        <div class="resumen-item">
+          <div><b>${p}</b></div>
+          <div><b>${money(porProveedor[p].total)}</b></div>
+        </div>
+      `;
+    });
+}
+
+/* ===========================
+   EXPORTAR EXCEL (2 HOJAS)
+=========================== */
+
+function exportarExcel() {
+  const filtrados = datos.filter(pasaFiltro);
+
+  // Hoja 1: Compras
+  const hojaCompras = filtrados.map(x => ({
+    Proveedor: x.proveedor,
+    Producto: x.producto,
+    Cantidad: x.cantidad,
+    "Costo unitario": x.costo,
+    Total: x.total,
+    Fecha: x.fecha ? toDateOnly(x.fecha) : "",
+    Estatus: x.estatus,
+    Pago: x.pago,
+    Nota: x.nota
+  }));
+
+  // Hoja 2: Resumen
+  const resumen = {};
+
+  filtrados.forEach(x => {
+    const key = `${x.producto}|||${x.proveedor}`;
+
+    if (!resumen[key]) resumen[key] = {
+      Producto: x.producto,
+      Proveedor: x.proveedor,
+      Cantidad: 0,
+      Total: 0
+    };
+
+    resumen[key].Cantidad += x.cantidad;
+    resumen[key].Total += x.total;
+  });
+
+  const hojaResumen = Object.values(resumen).map(r => ({
+    Producto: r.Producto,
+    Proveedor: r.Proveedor,
+    Cantidad: r.Cantidad,
+    Total: r.Total,
+    "Costo promedio ponderado": r.Cantidad ? (r.Total / r.Cantidad) : 0
+  }));
+
+  // Crear excel
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalle), "Compras");
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(resumen), "Resumen Producto-Fecha");
+
+  const ws1 = XLSX.utils.json_to_sheet(hojaCompras);
+  XLSX.utils.book_append_sheet(wb, ws1, "Compras");
+
+  const ws2 = XLSX.utils.json_to_sheet(hojaResumen);
+  XLSX.utils.book_append_sheet(wb, ws2, "Resumen");
 
   XLSX.writeFile(wb, "Compras_LaBonita.xlsx");
 }
 
-/* =================== MAIN =================== */
+/* ===========================
+   EVENTOS
+=========================== */
 
-async function cargarDatos() {
-  try {
-    const res = await fetch(CSV_URL, { cache: "no-store" });
-    const csv = await res.text();
-
-    registros = parseCSV(csv);
-
-    registros.sort((a, b) => {
-      const da = a.fechaCompra ? a.fechaCompra.getTime() : 0;
-      const db = b.fechaCompra ? b.fechaCompra.getTime() : 0;
-      return db - da;
-    });
-
-    mostrarTabla();
-    actualizarDashboard();
-    cargarSelectorProductos();
-    actualizarProveedoresDeProducto();
-  } catch (err) {
-    console.error(err);
-    alert("No se pudieron cargar los datos. Revisa permisos del Sheet.");
-  }
-}
-
-window.onload = () => {
+function bindEventos() {
   document.getElementById("btnAbrirForm").href = FORM_URL;
 
-  document.getElementById("buscador").addEventListener("input", () => {
-    mostrarTabla();
-    actualizarDashboard();
-  });
-
-  document.getElementById("fechaInicio").addEventListener("change", () => {
-    mostrarTabla();
-    actualizarDashboard();
-  });
-
-  document.getElementById("fechaFin").addEventListener("change", () => {
-    mostrarTabla();
-    actualizarDashboard();
-  });
-
-  document.getElementById("selectorProducto").addEventListener("change", () => {
-    actualizarProveedoresDeProducto();
-  });
-
-  document.getElementById("selectorProveedor").addEventListener("change", () => {
-    graficar();
+  document.getElementById("btnRefrescar").addEventListener("click", () => {
+    cargarDatos();
   });
 
   document.getElementById("btnExportar").addEventListener("click", () => {
     exportarExcel();
   });
 
+  document.getElementById("buscador").addEventListener("keyup", () => {
+    mostrar();
+    actualizarDashboard();
+    cargarSelectorProductos();
+    actualizarProveedoresDeProducto();
+    graficar();
+    resumenTotales();
+  });
+
+  document.getElementById("fechaInicio").addEventListener("change", () => {
+    mostrar();
+    actualizarDashboard();
+    cargarSelectorProductos();
+    actualizarProveedoresDeProducto();
+    graficar();
+    resumenTotales();
+  });
+
+  document.getElementById("fechaFin").addEventListener("change", () => {
+    mostrar();
+    actualizarDashboard();
+    cargarSelectorProductos();
+    actualizarProveedoresDeProducto();
+    graficar();
+    resumenTotales();
+  });
+
+  document.getElementById("selectorProducto").addEventListener("change", () => {
+    actualizarDashboard();
+    actualizarProveedoresDeProducto();
+    graficar();
+    resumenTotales();
+  });
+
+  document.getElementById("selectorProveedor").addEventListener("change", () => {
+    graficar();
+  });
+}
+
+/* ===========================
+   INICIO
+=========================== */
+
+window.onload = () => {
+  bindEventos();
   cargarDatos();
 };
+
+
 
 
 
