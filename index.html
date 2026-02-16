@@ -12,27 +12,27 @@
 </head>
 
 <body>
-
   <div class="app">
 
     <!-- TOPBAR -->
     <header class="topbar">
       <div class="topbar-left">
-        <img src="logo.png" alt="La Bonita" class="topbar-logo" />
+        <img src="logo.png" alt="La Bonita" class="topbar-logo">
         <div>
           <div class="topbar-title">ERP Compras</div>
           <div class="topbar-sub">La Bonita, Helados y Más…</div>
         </div>
       </div>
 
-      <a class="btn-ghost" id="btnAbrirForm" target="_blank" rel="noopener">
+      <a id="btnAbrirForm" class="btn-primary" href="#" target="_blank" rel="noopener">
         + Registrar compra
       </a>
     </header>
 
+    <!-- CONTENIDO -->
     <main class="content">
 
-      <!-- DASHBOARD -->
+      <!-- KPIS -->
       <section class="grid-4">
         <div class="kpi">
           <div class="kpi-title">Total invertido</div>
@@ -50,29 +50,65 @@
         </div>
 
         <div class="kpi">
-          <div class="kpi-title">Promedio por compra</div>
-          <div class="kpi-value" id="promedioGeneral">$0</div>
+          <div class="kpi-title">Costo promedio (producto)</div>
+          <div class="kpi-value" id="promedioProducto">$0</div>
         </div>
       </section>
 
-      <!-- PANEL COMPRAS -->
+      <!-- FILTROS -->
       <section class="panel">
         <div class="panel-header">
           <div>
-            <h3>Compras registradas</h3>
-            <p>Se registran con el Form. Editar/Borrar se hace en Sheets.</p>
+            <h3>Filtros</h3>
+            <p>Filtra por fechas, producto o proveedor.</p>
           </div>
-          <span class="badge">Compras</span>
+          <span class="badge">Control</span>
         </div>
 
-        <div class="toolbar">
-          <input id="buscador" placeholder="Buscar proveedor o producto..." />
-
-          <div class="toolbar-right">
-            <input id="fechaInicio" type="date" />
-            <input id="fechaFin" type="date" />
-            <button class="btn-secondary" id="btnExportar">Exportar Excel</button>
+        <div class="filtros-grid">
+          <div class="field">
+            <label>Buscar (proveedor o producto)</label>
+            <input id="buscador" placeholder="Ej. COSTCO o Fresa..." />
           </div>
+
+          <div class="field">
+            <label>Fecha inicio</label>
+            <input id="fechaInicio" type="date" />
+          </div>
+
+          <div class="field">
+            <label>Fecha fin</label>
+            <input id="fechaFin" type="date" />
+          </div>
+
+          <div class="field">
+            <label>Producto (para análisis)</label>
+            <select id="selectorProducto"></select>
+          </div>
+
+          <div class="field">
+            <label>Proveedor (para análisis)</label>
+            <select id="selectorProveedor"></select>
+          </div>
+
+          <div class="field">
+            <label>Acciones</label>
+            <div class="acciones-row">
+              <button class="btn-secondary" id="btnRefrescar">Actualizar</button>
+              <button class="btn-secondary" id="btnExportar">Exportar Excel</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TABLA -->
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>Historial de Compras</h3>
+            <p>Estas compras vienen de tu Google Sheets (respuestas del Form).</p>
+          </div>
+          <span class="badge">Compras</span>
         </div>
 
         <div class="table-wrap">
@@ -93,21 +129,20 @@
             <tbody id="tabla"></tbody>
           </table>
         </div>
+
+        <div class="mini-hint">
+          ⚠️ Si quieres borrar o editar, se hace directo en Sheets (así evitamos errores y bloqueos).
+        </div>
       </section>
 
-      <!-- PANEL ANALISIS -->
+      <!-- ANALISIS -->
       <section class="panel">
         <div class="panel-header">
           <div>
-            <h3>Análisis de costos</h3>
-            <p>Historial de costo por producto, por proveedor o general.</p>
+            <h3>Análisis de Costos</h3>
+            <p>Promedio ponderado por producto, y comparativo por proveedor.</p>
           </div>
           <span class="badge">Análisis</span>
-        </div>
-
-        <div class="toolbar">
-          <select id="selectorProducto"></select>
-          <select id="selectorProveedor"></select>
         </div>
 
         <div class="chart-wrap">
@@ -116,6 +151,29 @@
 
         <div id="variacion" class="variation"></div>
         <div id="mejorProveedor" class="best"></div>
+      </section>
+
+      <!-- RESUMEN -->
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>Resumen (lo más importante)</h3>
+            <p>Total por producto y por proveedor (según filtros).</p>
+          </div>
+          <span class="badge">Resumen</span>
+        </div>
+
+        <div class="resumen-grid">
+          <div class="resumen-card">
+            <h4>Total por producto</h4>
+            <div id="resumenProductos"></div>
+          </div>
+
+          <div class="resumen-card">
+            <h4>Total por proveedor</h4>
+            <div id="resumenProveedores"></div>
+          </div>
+        </div>
       </section>
 
       <footer class="footer">
@@ -128,5 +186,6 @@
   <script src="script.js"></script>
 </body>
 </html>
+
 
 
