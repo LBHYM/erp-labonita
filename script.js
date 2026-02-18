@@ -1,20 +1,15 @@
 /* ===========================
-   CONFIGURACION
+   CONFIG
 =========================== */
 
-// 1) TU FORM (para registrar)
+// CSV publicado de tu Sheet (Form_Responses)
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQtVGAhTNEJpkWKmTnzUMtiumBO8voTHx56Rds_oHCzzyRI-hXBuAlXKpSJoymnhhPQS4O5jkmHTWRL/pub?gid=1801367087&single=true&output=csv";
+
+// Link directo de tu Google Form (para registrar compras)
 const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScU3WYqUEGqQmgcWajim9ZZvBcpwt8ZOONEOOSzRCueI9xygQ/viewform";
 
-// 2) TU SHEET PUBLICADO COMO CSV (YA PUESTO)
-const SHEET_CSV_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vQtVGAhTNEJpkWKmTnzUMtiumBO8voTHx56Rds_oHCzzyRI-hXBuAlXKpSJoymnhhPQS4O5jkmHTWRL/pub?gid=1801367087&single=true&output=csv";
-
-/* ===========================
-   VARIABLES
-=========================== */
-
-let datos = [];
-let graficaActual = null;
+let RAW = [];      // registros crudos (objetos)
+let FILTRADOS = []; // registros filtrados
 
 /* ===========================
    UTILIDADES
@@ -29,156 +24,172 @@ function money(n) {
   return "$" + num.toFixed(2);
 }
 
-function parseNumber(n) {
+function toNumber(n) {
   if (n === null || n === undefined) return 0;
-
-  // Si viene como "350.00" o "367,25"
-  const s = n.toString().replace(",", ".");
-  const val = Number(s);
-  return isNaN(val) ? 0 : val;
+  const s = safeStr(n).replace(/[$,]/g, "");
+  const num = Number(s);
+  return isNaN(num) ? 0 : num;
 }
 
-function parseFecha(valor) {
-  if (!valor) return null;
+function parseDateFlexible(x) {
+  // Acepta:
+  // - 2026-02-04T06:00:00.000Z
+  // - 13/02/2026
+  // - 2026-02-13
+  const v = safeStr(x);
+  if (!v) return null;
 
-  // Si viene como "13/02/2026" (Forms)
-  if (valor.includes("/")) {
-    const [d, m, y] = valor.split("/");
-    return new Date(Number(y), Number(m) - 1, Number(d));
+  // ISO
+  if (v.includes("T") || v.includes("-")) {
+    const d = new Date(v);
+    if (!isNaN(d.getTime())) return d;
   }
 
-  // Si viene como ISO
-  return new Date(valor);
+  // dd/mm/yyyy
+  if (v.includes("/")) {
+    const parts = v.split("/");
+    if (parts.length === 3) {
+      const dd = Number(parts[0]);
+      const mm = Number(parts[1]);
+      const yyyy = Number(parts[2]);
+      const d = new Date(yyyy, mm - 1, dd);
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+
+  const d = new Date(v);
+  if (!isNaN(d.getTime())) return d;
+
+  return null;
 }
 
-function toDateOnly(fecha) {
-  if (!fecha) return "";
-  const d = new Date(fecha);
-  if (isNaN(d.getTime())) return "";
-  return d.toISOString().split("T")[0];
+function dateToISO(d) {
+  if (!d) return "";
+  try {
+    return new Date(d).toISOString().split("T")[0];
+  } catch {
+    return "";
+  }
+}
+
+function sameDayISO(d) {
+  if (!d) return "";
+  const dt = new Date(d);
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 /* ===========================
-   CSV -> ARRAY
+   CSV PARSER
 =========================== */
 
-function csvToArray(text) {
+function parseCSV(text) {
+  // parser simple (soporta comillas)
   const rows = [];
   let row = [];
-  let current = "";
-  let insideQuotes = false;
+  let cell = "";
+  let inQuotes = false;
 
   for (let i = 0; i < text.length; i++) {
-    const char = text[i];
+    const c = text[i];
     const next = text[i + 1];
 
-    if (char === '"' && insideQuotes && next === '"') {
-      current += '"';
+    if (c === '"' && inQuotes && next === '"') {
+      cell += '"';
       i++;
       continue;
     }
 
-    if (char === '"') {
-      insideQuotes = !insideQuotes;
+    if (c === '"') {
+      inQuotes = !inQuotes;
       continue;
     }
 
-    if (char === "," && !insideQuotes) {
-      row.push(current);
-      current = "";
+    if (c === "," && !inQuotes) {
+      row.push(cell);
+      cell = "";
       continue;
     }
 
-    if ((char === "\n" || char === "\r") && !insideQuotes) {
-      if (current.length || row.length) {
-        row.push(current);
+    if ((c === "\n" || c === "\r") && !inQuotes) {
+      if (cell.length > 0 || row.length > 0) {
+        row.push(cell);
         rows.push(row);
-        row = [];
-        current = "";
       }
+      row = [];
+      cell = "";
       continue;
     }
 
-    current += char;
+    cell += c;
   }
 
-  if (current.length || row.length) {
-    row.push(current);
+  if (cell.length > 0 || row.length > 0) {
+    row.push(cell);
     rows.push(row);
   }
 
-  return rows;
+  return rows.filter(r => r.some(x => safeStr(x) !== ""));
 }
 
 /* ===========================
-   CARGAR DATOS
+   CARGA
 =========================== */
 
-async function cargarDatos() {
-  try {
-    const res = await fetch(SHEET_CSV_URL);
-    const csv = await res.text();
+async function cargarCSV() {
+  const res = await fetch(CSV_URL + "&cache=" + Date.now());
+  const text = await res.text();
+  const data = parseCSV(text);
 
-    const arr = csvToArray(csv);
+  // Esperamos encabezados tipo:
+  // Marca temporal, Proveedor, Producto, Cantidad, Costo unitario, Fecha, Nota, Estatus, Pago
+  const headers = data[0].map(h => safeStr(h).toLowerCase());
 
-    // Encabezados (Forms)
-    // Marca temporal | Proveedor | Producto | Cantidad | Costo unitario | Fecha | Nota | Estatus | Pago
-    const headers = arr[0].map(h => safeStr(h).toLowerCase());
+  const idx = {
+    timestamp: headers.findIndex(h => h.includes("marca")),
+    proveedor: headers.findIndex(h => h.includes("proveedor")),
+    producto: headers.findIndex(h => h.includes("producto")),
+    cantidad: headers.findIndex(h => h.includes("cantidad")),
+    costo: headers.findIndex(h => h.includes("costo")),
+    fecha: headers.findIndex(h => h.includes("fecha")),
+    nota: headers.findIndex(h => h.includes("nota")),
+    estatus: headers.findIndex(h => h.includes("estatus")),
+    pago: headers.findIndex(h => h.includes("pago")),
+  };
 
-    const idx = {
-      proveedor: headers.indexOf("proveedor"),
-      producto: headers.indexOf("producto"),
-      cantidad: headers.indexOf("cantidad"),
-      costo: headers.indexOf("costo unitario"),
-      fecha: headers.indexOf("fecha"),
-      nota: headers.indexOf("nota"),
-      estatus: headers.indexOf("estatus"),
-      pago: headers.indexOf("pago"),
+  RAW = data.slice(1).map(r => {
+    const proveedor = safeStr(r[idx.proveedor]);
+    const producto = safeStr(r[idx.producto]);
+    const cantidad = toNumber(r[idx.cantidad]);
+    const costo = toNumber(r[idx.costo]);
+    const fecha = parseDateFlexible(r[idx.fecha]) || parseDateFlexible(r[idx.timestamp]);
+
+    const estatus = safeStr(r[idx.estatus]) || "Activo";
+    const pago = safeStr(r[idx.pago]) || "Pendiente";
+    const nota = safeStr(r[idx.nota]);
+
+    return {
+      proveedor,
+      producto,
+      cantidad,
+      costo,
+      total: cantidad * costo,
+      fecha,
+      fechaISO: sameDayISO(fecha),
+      estatus,
+      pago,
+      nota
     };
+  });
 
-    const registros = arr.slice(1).filter(r => r.length > 1);
+  // Limpiar basura: filas vacías
+  RAW = RAW.filter(x => x.proveedor || x.producto);
 
-    datos = registros.map(r => {
-      const proveedor = safeStr(r[idx.proveedor]);
-      const producto = safeStr(r[idx.producto]);
-
-      const cantidad = parseNumber(r[idx.cantidad]);
-      const costo = parseNumber(r[idx.costo]);
-      const fecha = parseFecha(r[idx.fecha]);
-
-      const nota = safeStr(r[idx.nota]);
-      const estatus = safeStr(r[idx.estatus]);
-      const pago = safeStr(r[idx.pago]);
-
-      const total = cantidad * costo;
-
-      return {
-        proveedor,
-        producto,
-        cantidad,
-        costo,
-        total,
-        fecha,
-        nota,
-        estatus,
-        pago,
-      };
-    });
-
-    // Ordenar por fecha DESC
-    datos.sort((a, b) => (b.fecha?.getTime() || 0) - (a.fecha?.getTime() || 0));
-
-    // Pintar todo
-    mostrar();
-    actualizarDashboard();
-    cargarSelectorProductos();
-    actualizarProveedoresDeProducto();
-    graficar();
-    resumenTotales();
-  } catch (err) {
-    console.error(err);
-    alert("No pude leer el CSV. Revisa que esté publicado en la web como CSV.");
-  }
+  // Inicializar selects y vista
+  poblarSelects();
+  aplicarFiltros();
 }
 
 /* ===========================
@@ -186,432 +197,347 @@ async function cargarDatos() {
 =========================== */
 
 function getFiltros() {
-  const buscador = safeStr(document.getElementById("buscador").value).toLowerCase();
-  const inicio = document.getElementById("fechaInicio").value;
-  const fin = document.getElementById("fechaFin").value;
+  const desde = document.getElementById("fDesde").value;
+  const hasta = document.getElementById("fHasta").value;
+  const proveedor = document.getElementById("fProveedor").value;
+  const producto = document.getElementById("fProducto").value;
+  const pago = document.getElementById("fPago").value;
+  const verCancelados = document.getElementById("fVerCancelados").checked;
 
-  const dInicio = inicio ? new Date(inicio + "T00:00:00") : null;
-  const dFin = fin ? new Date(fin + "T23:59:59") : null;
-
-  return { buscador, dInicio, dFin };
+  return { desde, hasta, proveedor, producto, pago, verCancelados };
 }
 
-function pasaFiltro(item) {
-  const { buscador, dInicio, dFin } = getFiltros();
+function pasaFiltroFecha(reg, desde, hasta) {
+  if (!reg.fechaISO) return false;
 
-  if (buscador) {
-    const p = (item.proveedor || "").toLowerCase();
-    const pr = (item.producto || "").toLowerCase();
-    if (!p.includes(buscador) && !pr.includes(buscador)) return false;
-  }
-
-  if (dInicio && item.fecha && item.fecha < dInicio) return false;
-  if (dFin && item.fecha && item.fecha > dFin) return false;
+  if (desde && reg.fechaISO < desde) return false;
+  if (hasta && reg.fechaISO > hasta) return false;
 
   return true;
+}
+
+function aplicarFiltros() {
+  const f = getFiltros();
+
+  FILTRADOS = RAW.filter(r => {
+    if (!pasaFiltroFecha(r, f.desde, f.hasta)) return false;
+
+    if (f.proveedor !== "__TODOS__" && safeStr(r.proveedor) !== safeStr(f.proveedor)) return false;
+    if (f.producto !== "__TODOS__" && safeStr(r.producto) !== safeStr(f.producto)) return false;
+
+    if (f.pago !== "__TODOS__" && safeStr(r.pago).toLowerCase() !== safeStr(f.pago).toLowerCase()) return false;
+
+    // ESTATUS:
+    // Por default: NO mostrar cancelados
+    if (!f.verCancelados && safeStr(r.estatus).toLowerCase() === "cancelado") return false;
+
+    return true;
+  });
+
+  // Orden por fecha DESC
+  FILTRADOS.sort((a, b) => (b.fecha?.getTime() || 0) - (a.fecha?.getTime() || 0));
+
+  pintarTabla();
+  actualizarKPIs();
+  generarResumen();
+}
+
+/* ===========================
+   SELECTS
+=========================== */
+
+function poblarSelects() {
+  const sProv = document.getElementById("fProveedor");
+  const sProd = document.getElementById("fProducto");
+
+  const proveedores = [...new Set(RAW.map(r => safeStr(r.proveedor)).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const productos = [...new Set(RAW.map(r => safeStr(r.producto)).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+
+  sProv.innerHTML = `<option value="__TODOS__">Todos</option>`;
+  proveedores.forEach(p => sProv.innerHTML += `<option value="${p}">${p}</option>`);
+
+  sProd.innerHTML = `<option value="__TODOS__">Todos</option>`;
+  productos.forEach(p => sProd.innerHTML += `<option value="${p}">${p}</option>`);
 }
 
 /* ===========================
    TABLA
 =========================== */
 
-function mostrar() {
+function pintarTabla() {
   const tabla = document.getElementById("tabla");
+  const contador = document.getElementById("contador");
+
   tabla.innerHTML = "";
 
-  const filtrados = datos.filter(pasaFiltro);
+  FILTRADOS.forEach(r => {
+    const fechaTxt = r.fecha ? r.fecha.toLocaleDateString() : "";
 
-  filtrados.forEach(item => {
+    const estatusLower = safeStr(r.estatus).toLowerCase();
+    const badgeEstatus = estatusLower === "cancelado"
+      ? `<span class="tag tag-cancel">Cancelado</span>`
+      : `<span class="tag tag-ok">Activo</span>`;
+
+    const pagoLower = safeStr(r.pago).toLowerCase();
+    const badgePago = pagoLower === "pagado"
+      ? `<span class="tag tag-paid">Pagado</span>`
+      : `<span class="tag tag-pend">Pendiente</span>`;
+
     tabla.innerHTML += `
       <tr>
-        <td>${safeStr(item.proveedor)}</td>
-        <td>${safeStr(item.producto)}</td>
-        <td>${item.cantidad}</td>
-        <td>${money(item.costo)}</td>
-        <td><b>${money(item.total)}</b></td>
-        <td>${item.fecha ? item.fecha.toLocaleDateString() : ""}</td>
-        <td>${safeStr(item.estatus) || "-"}</td>
-        <td>${safeStr(item.pago) || "-"}</td>
-        <td>${safeStr(item.nota)}</td>
+        <td>${safeStr(r.proveedor)}</td>
+        <td>${safeStr(r.producto)}</td>
+        <td>${r.cantidad}</td>
+        <td>${money(r.costo)}</td>
+        <td><b>${money(r.total)}</b></td>
+        <td>${fechaTxt}</td>
+        <td>${badgeEstatus}</td>
+        <td>${badgePago}</td>
+        <td>${safeStr(r.nota)}</td>
       </tr>
     `;
   });
 
-  document.getElementById("totalCompras").innerText = filtrados.length;
+  contador.innerText = `Mostrando ${FILTRADOS.length} compras (según filtros).`;
 }
 
 /* ===========================
-   DASHBOARD
+   KPIs
 =========================== */
 
-function actualizarDashboard() {
-  const filtrados = datos.filter(pasaFiltro);
+function actualizarKPIs() {
+  const total = FILTRADOS.reduce((a, b) => a + (b.total || 0), 0);
+  document.getElementById("kpiTotal").innerText = money(total);
+  document.getElementById("kpiCompras").innerText = FILTRADOS.length;
 
-  let totalInvertido = 0;
-  let resumenCantidad = {};
-
-  filtrados.forEach(x => {
-    totalInvertido += x.total;
-
-    if (!resumenCantidad[x.producto]) resumenCantidad[x.producto] = 0;
-    resumenCantidad[x.producto] += x.cantidad;
-  });
-
-  document.getElementById("totalInvertido").innerText = money(totalInvertido);
-
-  let top = "-";
-  let max = 0;
-
-  Object.keys(resumenCantidad).forEach(p => {
-    if (resumenCantidad[p] > max) {
-      max = resumenCantidad[p];
-      top = p;
-    }
-  });
-
-  document.getElementById("productoTop").innerText = top;
-
-  // Promedio ponderado del producto seleccionado
-  const prodSel = document.getElementById("selectorProducto").value;
-  const prom = promedioPonderado(prodSel, filtrados);
-  document.getElementById("promedioProducto").innerText = prom ? money(prom) : "$0";
-}
-
-/* ===========================
-   PROMEDIO PONDERADO
-=========================== */
-
-function promedioPonderado(producto, lista) {
-  if (!producto) return 0;
-
-  const rows = lista.filter(x => safeStr(x.producto) === safeStr(producto));
-  if (!rows.length) return 0;
-
-  const totalGastado = rows.reduce((a, b) => a + (b.total || 0), 0);
-  const totalCantidad = rows.reduce((a, b) => a + (b.cantidad || 0), 0);
-
-  if (!totalCantidad) return 0;
-  return totalGastado / totalCantidad;
-}
-
-/* ===========================
-   SELECTORES
-=========================== */
-
-function cargarSelectorProductos() {
-  const selector = document.getElementById("selectorProducto");
-  selector.innerHTML = "";
-
-  const filtrados = datos.filter(pasaFiltro);
-  const productos = [...new Set(filtrados.map(x => x.producto))].filter(Boolean).sort();
-
-  productos.forEach(p => {
-    selector.innerHTML += `<option value="${p}">${p}</option>`;
-  });
-
-  if (!selector.value && productos.length) selector.value = productos[0];
-}
-
-function actualizarProveedoresDeProducto() {
-  const prod = document.getElementById("selectorProducto").value;
-  const selectorProveedor = document.getElementById("selectorProveedor");
-
-  const filtrados = datos.filter(pasaFiltro);
-  const proveedores = [...new Set(
-    filtrados
-      .filter(x => safeStr(x.producto) === safeStr(prod))
-      .map(x => x.proveedor)
-  )].filter(Boolean).sort();
-
-  selectorProveedor.innerHTML = `<option value="__TODOS__">Todos los proveedores</option>`;
-
-  proveedores.forEach(p => {
-    selectorProveedor.innerHTML += `<option value="${p}">${p}</option>`;
-  });
-}
-
-/* ===========================
-   GRAFICA
-=========================== */
-
-function graficar() {
-  const prod = document.getElementById("selectorProducto").value;
-  const prov = document.getElementById("selectorProveedor").value;
-
-  const variacion = document.getElementById("variacion");
-  const mejorProveedor = document.getElementById("mejorProveedor");
-
-  const filtrados = datos.filter(pasaFiltro);
-
-  let historial = filtrados.filter(x => safeStr(x.producto) === safeStr(prod));
-
-  if (prov !== "__TODOS__") {
-    historial = historial.filter(x => safeStr(x.proveedor) === safeStr(prov));
-  }
-
-  historial.sort((a, b) => (a.fecha?.getTime() || 0) - (b.fecha?.getTime() || 0));
-
-  const labels = historial.map(x => x.fecha ? x.fecha.toLocaleDateString() : "");
-  const precios = historial.map(x => x.costo);
-
-  if (graficaActual) graficaActual.destroy();
-
-  graficaActual = new Chart(document.getElementById("grafica"), {
-    type: "line",
-    data: {
-      labels,
-      datasets: [{
-        label: prov === "__TODOS__" ? `Costo general: ${prod}` : `Costo ${prov}: ${prod}`,
-        data: precios,
-        borderColor: "#C29B40",
-        fill: false
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false
-    }
-  });
-
-  // Variación
-  if (!precios.length) {
-    variacion.innerText = "Sin datos para este filtro.";
-  } else {
-    const ultimo = precios[precios.length - 1];
-    const promedio = precios.reduce((a, b) => a + b, 0) / precios.length;
-
-    let texto = `📌 Último costo: ${money(ultimo)} • Promedio simple: ${money(promedio)}`;
-
-    if (precios.length >= 2) {
-      const diff = ultimo - precios[precios.length - 2];
-      texto += diff > 0 ? ` • 🔺 Subió ${money(diff)}`
-        : diff < 0 ? ` • 🔻 Bajó ${money(Math.abs(diff))}`
-        : ` • ➖ Sin cambio`;
-    }
-
-    // PROMEDIO PONDERADO (el bueno)
-    const promPond = promedioPonderado(prod, filtrados);
-    texto += ` • ⭐ Promedio ponderado real: ${money(promPond)}`;
-
-    variacion.innerText = texto;
-  }
-
-  // Mejor proveedor (solo si todos)
-  if (prov === "__TODOS__") {
-    const porProveedor = {};
-
-    filtrados
-      .filter(x => safeStr(x.producto) === safeStr(prod))
-      .forEach(x => {
-        const p = safeStr(x.proveedor);
-        if (!porProveedor[p]) porProveedor[p] = { total: 0, cantidad: 0 };
-        porProveedor[p].total += x.total;
-        porProveedor[p].cantidad += x.cantidad;
-      });
-
-    let mejor = null;
-    let mejorProm = Infinity;
-
-    Object.keys(porProveedor).forEach(p => {
-      const cant = porProveedor[p].cantidad;
-      const prom = cant ? porProveedor[p].total / cant : Infinity;
-
-      if (prom < mejorProm) {
-        mejorProm = prom;
-        mejor = p;
-      }
-    });
-
-    mejorProveedor.innerHTML = mejor
-      ? `🏆 <b>Mejor proveedor para "${prod}"</b>: ${mejor} (Promedio ponderado: ${money(mejorProm)})`
-      : "";
-  } else {
-    mejorProveedor.innerHTML = "";
-  }
-}
-
-/* ===========================
-   RESUMEN TOTALES
-=========================== */
-
-function resumenTotales() {
-  const filtrados = datos.filter(pasaFiltro);
-
+  // Producto top por TOTAL gastado
   const porProducto = {};
-  const porProveedor = {};
-
-  filtrados.forEach(x => {
-    // producto
-    if (!porProducto[x.producto]) porProducto[x.producto] = { total: 0, cantidad: 0 };
-    porProducto[x.producto].total += x.total;
-    porProducto[x.producto].cantidad += x.cantidad;
-
-    // proveedor
-    if (!porProveedor[x.proveedor]) porProveedor[x.proveedor] = { total: 0 };
-    porProveedor[x.proveedor].total += x.total;
+  FILTRADOS.forEach(r => {
+    const k = safeStr(r.producto) || "-";
+    if (!porProducto[k]) porProducto[k] = 0;
+    porProducto[k] += r.total || 0;
   });
 
-  // Producto
+  let topProd = "-";
+  let topProdVal = 0;
+  Object.keys(porProducto).forEach(k => {
+    if (porProducto[k] > topProdVal) {
+      topProdVal = porProducto[k];
+      topProd = k;
+    }
+  });
+  document.getElementById("kpiProductoTop").innerText = topProd;
+
+  // Proveedor top por TOTAL gastado
+  const porProv = {};
+  FILTRADOS.forEach(r => {
+    const k = safeStr(r.proveedor) || "-";
+    if (!porProv[k]) porProv[k] = 0;
+    porProv[k] += r.total || 0;
+  });
+
+  let topProv = "-";
+  let topProvVal = 0;
+  Object.keys(porProv).forEach(k => {
+    if (porProv[k] > topProvVal) {
+      topProvVal = porProv[k];
+      topProv = k;
+    }
+  });
+  document.getElementById("kpiProveedorTop").innerText = topProv;
+}
+
+/* ===========================
+   RESUMEN (PROMEDIO PONDERADO)
+=========================== */
+
+function generarResumen() {
   const contProd = document.getElementById("resumenProductos");
-  contProd.innerHTML = "";
-
-  Object.keys(porProducto)
-    .sort((a, b) => porProducto[b].total - porProducto[a].total)
-    .slice(0, 20)
-    .forEach(p => {
-      const total = porProducto[p].total;
-      const cant = porProducto[p].cantidad;
-      const prom = cant ? total / cant : 0;
-
-      contProd.innerHTML += `
-        <div class="resumen-item">
-          <div>
-            <b>${p}</b><br>
-            <span style="color:#7a7a7a;font-size:12px;">
-              Cantidad: ${cant} • Promedio ponderado: ${money(prom)}
-            </span>
-          </div>
-          <div><b>${money(total)}</b></div>
-        </div>
-      `;
-    });
-
-  // Proveedor
   const contProv = document.getElementById("resumenProveedores");
+
+  contProd.innerHTML = "";
   contProv.innerHTML = "";
 
-  Object.keys(porProveedor)
-    .sort((a, b) => porProveedor[b].total - porProveedor[a].total)
-    .slice(0, 20)
-    .forEach(p => {
-      contProv.innerHTML += `
-        <div class="resumen-item">
-          <div><b>${p}</b></div>
-          <div><b>${money(porProveedor[p].total)}</b></div>
+  // Resumen por producto:
+  // total = suma(total)
+  // cantidad = suma(cantidad)
+  // promedio ponderado = total / cantidad
+  const porProducto = {};
+  FILTRADOS.forEach(r => {
+    const k = safeStr(r.producto) || "-";
+    if (!porProducto[k]) porProducto[k] = { total: 0, cantidad: 0 };
+    porProducto[k].total += r.total || 0;
+    porProducto[k].cantidad += r.cantidad || 0;
+  });
+
+  const listaProd = Object.entries(porProducto)
+    .map(([k, v]) => {
+      const prom = v.cantidad ? v.total / v.cantidad : 0;
+      return { producto: k, total: v.total, cantidad: v.cantidad, promedio: prom };
+    })
+    .sort((a, b) => b.total - a.total);
+
+  listaProd.forEach(x => {
+    contProd.innerHTML += `
+      <div class="item">
+        <div>
+          <b>${x.producto}</b>
+          <small>Cantidad: ${x.cantidad} • Promedio ponderado: ${money(x.promedio)}</small>
         </div>
-      `;
-    });
+        <div class="monto">${money(x.total)}</div>
+      </div>
+    `;
+  });
+
+  // Resumen por proveedor:
+  const porProveedor = {};
+  FILTRADOS.forEach(r => {
+    const k = safeStr(r.proveedor) || "-";
+    if (!porProveedor[k]) porProveedor[k] = 0;
+    porProveedor[k] += r.total || 0;
+  });
+
+  const listaProv = Object.entries(porProveedor)
+    .map(([k, v]) => ({ proveedor: k, total: v }))
+    .sort((a, b) => b.total - a.total);
+
+  listaProv.forEach(x => {
+    contProv.innerHTML += `
+      <div class="item">
+        <div>
+          <b>${x.proveedor}</b>
+          <small>Total invertido</small>
+        </div>
+        <div class="monto">${money(x.total)}</div>
+      </div>
+    `;
+  });
 }
 
 /* ===========================
-   EXPORTAR EXCEL (2 HOJAS)
+   EXPORTAR EXCEL (3 HOJAS)
 =========================== */
 
 function exportarExcel() {
-  const filtrados = datos.filter(pasaFiltro);
-
-  // Hoja 1: Compras
-  const hojaCompras = filtrados.map(x => ({
-    Proveedor: x.proveedor,
-    Producto: x.producto,
-    Cantidad: x.cantidad,
-    "Costo unitario": x.costo,
-    Total: x.total,
-    Fecha: x.fecha ? toDateOnly(x.fecha) : "",
-    Estatus: x.estatus,
-    Pago: x.pago,
-    Nota: x.nota
-  }));
-
-  // Hoja 2: Resumen
-  const resumen = {};
-
-  filtrados.forEach(x => {
-    const key = `${x.producto}|||${x.proveedor}`;
-
-    if (!resumen[key]) resumen[key] = {
-      Producto: x.producto,
-      Proveedor: x.proveedor,
-      Cantidad: 0,
-      Total: 0
-    };
-
-    resumen[key].Cantidad += x.cantidad;
-    resumen[key].Total += x.total;
-  });
-
-  const hojaResumen = Object.values(resumen).map(r => ({
-    Producto: r.Producto,
-    Proveedor: r.Proveedor,
-    Cantidad: r.Cantidad,
-    Total: r.Total,
-    "Costo promedio ponderado": r.Cantidad ? (r.Total / r.Cantidad) : 0
-  }));
-
-  // Crear excel
   const wb = XLSX.utils.book_new();
+
+  // Hoja 1: Compras filtradas
+  const hojaCompras = FILTRADOS.map(r => ({
+    Proveedor: r.proveedor,
+    Producto: r.producto,
+    Cantidad: r.cantidad,
+    "Costo unitario": r.costo,
+    Total: r.total,
+    Fecha: r.fechaISO,
+    Estatus: r.estatus,
+    Pago: r.pago,
+    Nota: r.nota
+  }));
 
   const ws1 = XLSX.utils.json_to_sheet(hojaCompras);
   XLSX.utils.book_append_sheet(wb, ws1, "Compras");
 
-  const ws2 = XLSX.utils.json_to_sheet(hojaResumen);
-  XLSX.utils.book_append_sheet(wb, ws2, "Resumen");
+  // Hoja 2: Resumen por producto
+  const porProducto = {};
+  FILTRADOS.forEach(r => {
+    const k = safeStr(r.producto) || "-";
+    if (!porProducto[k]) porProducto[k] = { total: 0, cantidad: 0 };
+    porProducto[k].total += r.total || 0;
+    porProducto[k].cantidad += r.cantidad || 0;
+  });
 
+  const hojaProd = Object.entries(porProducto).map(([producto, v]) => ({
+    Producto: producto,
+    Cantidad: v.cantidad,
+    Total: v.total,
+    "Costo promedio ponderado": v.cantidad ? (v.total / v.cantidad) : 0
+  })).sort((a, b) => b.Total - a.Total);
+
+  const ws2 = XLSX.utils.json_to_sheet(hojaProd);
+  XLSX.utils.book_append_sheet(wb, ws2, "Resumen_Producto");
+
+  // Hoja 3: Resumen por proveedor
+  const porProv = {};
+  FILTRADOS.forEach(r => {
+    const k = safeStr(r.proveedor) || "-";
+    if (!porProv[k]) porProv[k] = 0;
+    porProv[k] += r.total || 0;
+  });
+
+  const hojaProv = Object.entries(porProv).map(([proveedor, total]) => ({
+    Proveedor: proveedor,
+    Total: total
+  })).sort((a, b) => b.Total - a.Total);
+
+  const ws3 = XLSX.utils.json_to_sheet(hojaProv);
+  XLSX.utils.book_append_sheet(wb, ws3, "Resumen_Proveedor");
+
+  // Descargar
   XLSX.writeFile(wb, "Compras_LaBonita.xlsx");
 }
 
 /* ===========================
-   EVENTOS
+   UI EVENTS
 =========================== */
 
-function bindEventos() {
-  document.getElementById("btnAbrirForm").href = FORM_URL;
+function limpiarFiltros() {
+  document.getElementById("fDesde").value = "";
+  document.getElementById("fHasta").value = "";
+  document.getElementById("fProveedor").value = "__TODOS__";
+  document.getElementById("fProducto").value = "__TODOS__";
+  document.getElementById("fPago").value = "__TODOS__";
+  document.getElementById("fVerCancelados").checked = false;
 
-  document.getElementById("btnRefrescar").addEventListener("click", () => {
-    cargarDatos();
-  });
-
-  document.getElementById("btnExportar").addEventListener("click", () => {
-    exportarExcel();
-  });
-
-  document.getElementById("buscador").addEventListener("keyup", () => {
-    mostrar();
-    actualizarDashboard();
-    cargarSelectorProductos();
-    actualizarProveedoresDeProducto();
-    graficar();
-    resumenTotales();
-  });
-
-  document.getElementById("fechaInicio").addEventListener("change", () => {
-    mostrar();
-    actualizarDashboard();
-    cargarSelectorProductos();
-    actualizarProveedoresDeProducto();
-    graficar();
-    resumenTotales();
-  });
-
-  document.getElementById("fechaFin").addEventListener("change", () => {
-    mostrar();
-    actualizarDashboard();
-    cargarSelectorProductos();
-    actualizarProveedoresDeProducto();
-    graficar();
-    resumenTotales();
-  });
-
-  document.getElementById("selectorProducto").addEventListener("change", () => {
-    actualizarDashboard();
-    actualizarProveedoresDeProducto();
-    graficar();
-    resumenTotales();
-  });
-
-  document.getElementById("selectorProveedor").addEventListener("change", () => {
-    graficar();
-  });
+  aplicarFiltros();
 }
 
 /* ===========================
-   INICIO
+   INIT
 =========================== */
 
 window.onload = () => {
-  bindEventos();
-  cargarDatos();
+  // Botón al Forms
+  const btnForm = document.getElementById("btnAbrirForm");
+  btnForm.href = FORM_URL;
+
+  // Botones
+  document.getElementById("btnAplicar").onclick = aplicarFiltros;
+  document.getElementById("btnLimpiar").onclick = limpiarFiltros;
+  document.getElementById("btnExportar").onclick = exportarExcel;
+
+  // Cargar datos
+  cargarCSV().catch(err => {
+    console.error(err);
+    alert("No pude cargar el CSV del Sheet. Revisa que esté publicado como CSV.");
+  });
 };
+
+/* ===========================
+   TAGS (inyectado por JS)
+=========================== */
+
+(function injectTagStyles(){
+  const css = `
+  .tag{
+    display:inline-block;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:900;
+    border:1px solid rgba(0,0,0,.08);
+    white-space:nowrap;
+  }
+  .tag-ok{ background: rgba(34,197,94,.12); color:#14532d; }
+  .tag-cancel{ background: rgba(239,68,68,.12); color:#7f1d1d; }
+  .tag-paid{ background: rgba(59,130,246,.12); color:#1e3a8a; }
+  .tag-pend{ background: rgba(245,158,11,.14); color:#7c2d12; }
+  `;
+  const style = document.createElement("style");
+  style.innerHTML = css;
+  document.head.appendChild(style);
+})();
+
+
 
 
 
