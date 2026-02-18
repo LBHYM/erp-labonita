@@ -7,7 +7,6 @@
 
   <link rel="stylesheet" href="styles.css" />
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 
@@ -17,41 +16,41 @@
     <!-- TOPBAR -->
     <header class="topbar">
       <div class="topbar-left">
-        <img src="logo.png" alt="La Bonita" class="topbar-logo">
+        <img src="logo.png" alt="La Bonita" class="topbar-logo" />
         <div>
           <div class="topbar-title">ERP Compras</div>
           <div class="topbar-sub">La Bonita, Helados y Más…</div>
         </div>
       </div>
 
-      <a id="btnAbrirForm" class="btn-primary" href="#" target="_blank" rel="noopener">
-        + Registrar compra
-      </a>
+      <div class="topbar-right">
+        <a class="btn-ghost" id="btnAbrirForm" target="_blank" rel="noopener">➕ Registrar compra</a>
+      </div>
     </header>
 
     <!-- CONTENIDO -->
     <main class="content">
 
-      <!-- KPIS -->
+      <!-- DASHBOARD -->
       <section class="grid-4">
         <div class="kpi">
           <div class="kpi-title">Total invertido</div>
-          <div class="kpi-value" id="totalInvertido">$0</div>
+          <div class="kpi-value" id="kpiTotal">$0</div>
         </div>
 
         <div class="kpi">
-          <div class="kpi-title">Total compras</div>
-          <div class="kpi-value" id="totalCompras">0</div>
+          <div class="kpi-title">Compras (filtradas)</div>
+          <div class="kpi-value" id="kpiCompras">0</div>
         </div>
 
         <div class="kpi">
-          <div class="kpi-title">Producto más comprado</div>
-          <div class="kpi-value" id="productoTop">-</div>
+          <div class="kpi-title">Producto top</div>
+          <div class="kpi-value" id="kpiProductoTop">-</div>
         </div>
 
         <div class="kpi">
-          <div class="kpi-title">Costo promedio (producto)</div>
-          <div class="kpi-value" id="promedioProducto">$0</div>
+          <div class="kpi-title">Proveedor top</div>
+          <div class="kpi-value" id="kpiProveedorTop">-</div>
         </div>
       </section>
 
@@ -60,44 +59,54 @@
         <div class="panel-header">
           <div>
             <h3>Filtros</h3>
-            <p>Filtra por fechas, producto o proveedor.</p>
+            <p>Filtra por fecha, producto, proveedor y estatus.</p>
           </div>
-          <span class="badge">Control</span>
+          <span class="badge">Filtros</span>
         </div>
 
-        <div class="filtros-grid">
+        <div class="filters">
           <div class="field">
-            <label>Buscar (proveedor o producto)</label>
-            <input id="buscador" placeholder="Ej. COSTCO o Fresa..." />
+            <label>Desde</label>
+            <input id="fDesde" type="date" />
           </div>
 
           <div class="field">
-            <label>Fecha inicio</label>
-            <input id="fechaInicio" type="date" />
+            <label>Hasta</label>
+            <input id="fHasta" type="date" />
           </div>
 
           <div class="field">
-            <label>Fecha fin</label>
-            <input id="fechaFin" type="date" />
+            <label>Proveedor</label>
+            <select id="fProveedor"></select>
           </div>
 
           <div class="field">
-            <label>Producto (para análisis)</label>
-            <select id="selectorProducto"></select>
+            <label>Producto</label>
+            <select id="fProducto"></select>
           </div>
 
           <div class="field">
-            <label>Proveedor (para análisis)</label>
-            <select id="selectorProveedor"></select>
+            <label>Pago</label>
+            <select id="fPago">
+              <option value="__TODOS__">Todos</option>
+              <option value="Pagado">Pagado</option>
+              <option value="Pendiente">Pendiente</option>
+            </select>
           </div>
 
-          <div class="field">
-            <label>Acciones</label>
-            <div class="acciones-row">
-              <button class="btn-secondary" id="btnRefrescar">Actualizar</button>
-              <button class="btn-secondary" id="btnExportar">Exportar Excel</button>
-            </div>
+          <div class="field field-switch">
+            <label>Mostrar cancelados</label>
+            <label class="switch">
+              <input id="fVerCancelados" type="checkbox" />
+              <span class="slider"></span>
+            </label>
           </div>
+        </div>
+
+        <div class="filters-actions">
+          <button class="btn-secondary" id="btnAplicar">Aplicar filtros</button>
+          <button class="btn-ghost" id="btnLimpiar">Limpiar</button>
+          <button class="btn-primary" id="btnExportar">Exportar Excel</button>
         </div>
       </section>
 
@@ -105,10 +114,10 @@
       <section class="panel">
         <div class="panel-header">
           <div>
-            <h3>Historial de Compras</h3>
-            <p>Estas compras vienen de tu Google Sheets (respuestas del Form).</p>
+            <h3>Compras</h3>
+            <p>Este listado viene de Google Sheets (Forms). No se edita desde aquí.</p>
           </div>
-          <span class="badge">Compras</span>
+          <span class="badge">Datos</span>
         </div>
 
         <div class="table-wrap">
@@ -130,27 +139,7 @@
           </table>
         </div>
 
-        <div class="mini-hint">
-          ⚠️ Si quieres borrar o editar, se hace directo en Sheets (así evitamos errores y bloqueos).
-        </div>
-      </section>
-
-      <!-- ANALISIS -->
-      <section class="panel">
-        <div class="panel-header">
-          <div>
-            <h3>Análisis de Costos</h3>
-            <p>Promedio ponderado por producto, y comparativo por proveedor.</p>
-          </div>
-          <span class="badge">Análisis</span>
-        </div>
-
-        <div class="chart-wrap">
-          <canvas id="grafica"></canvas>
-        </div>
-
-        <div id="variacion" class="variation"></div>
-        <div id="mejorProveedor" class="best"></div>
+        <div class="muted" id="contador"></div>
       </section>
 
       <!-- RESUMEN -->
@@ -164,14 +153,14 @@
         </div>
 
         <div class="resumen-grid">
-          <div class="resumen-card">
+          <div class="card">
             <h4>Total por producto</h4>
-            <div id="resumenProductos"></div>
+            <div id="resumenProductos" class="resumen-list"></div>
           </div>
 
-          <div class="resumen-card">
+          <div class="card">
             <h4>Total por proveedor</h4>
-            <div id="resumenProveedores"></div>
+            <div id="resumenProveedores" class="resumen-list"></div>
           </div>
         </div>
       </section>
@@ -187,7 +176,6 @@
 </body>
 </html>
 
-</html>
 
 
 
